@@ -1,0 +1,98 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const { StatusCodes } = require('http-status-codes');
+
+// Initialize Express app
+const app = express();
+
+// ======================================
+// 🛡️ 1. Security & Middleware
+// ======================================
+app.use(helmet()); // Secure HTTP headers
+app.use(cors()); 
+// app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' })); 
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting (100 requests per 15 mins per IP)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests, please try again later.'
+});
+app.use(limiter);
+
+// Logging (skip in test mode)
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
+
+// ======================================
+// 📦 2. Database Connection (MongoDB)
+// ======================================
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/wassila';
+
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  retryWrites: true,
+  w: 'majority'
+})
+.then(() => console.log('✅ MongoDB connected successfully!'))
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  process.exit(1);
+});
+
+// ======================================
+// # 🚀 4. Routes
+// ======================================
+// app.use('/api/auth', require('./routes/auth'));
+// app.use('/api/drivers', require('./routes/drivers'));
+// app.use('/api/artisans', require('./routes/artisans'));
+// app.use('/api/bookings', require('./routes/bookings'));
+
+// ======================================
+// # 🩺 5. Health Check Endpoint
+// ======================================
+app.get('/health', (req, res) => {
+  res.status(StatusCodes.OK).json({
+    status: 'UP',
+    timestamp: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED'
+  });
+});
+
+// ======================================
+// # ❌ 6. Error Handling Middleware
+// ======================================
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    error: {
+      message: err.message || 'Something went wrong!',
+      code: err.code || 'INTERNAL_ERROR'
+    }
+  });
+});
+
+// ======================================
+// # 🔥 7. Start Server
+// ======================================
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+// Handle unhandled promise rejections (e.g., DB errors)
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err.message);
+  server.close(() => process.exit(1));
+});
+
+module.exports = server;
