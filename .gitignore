@@ -1,0 +1,18 @@
+# Node modules directory
+node_modules/
+
+# npm debug logs
+npm-debug.log*
+
+# Environment variables
+.env
+
+# Build directories
+/dist
+/build
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
