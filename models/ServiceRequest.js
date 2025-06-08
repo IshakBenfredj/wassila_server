@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { requestStatuses } = require('../constants/enum');
 
 const serviceRequestSchema = new mongoose.Schema({
   artisanId: { type: mongoose.Schema.Types.ObjectId, ref: 'Artisan', required: true },
@@ -9,7 +10,7 @@ const serviceRequestSchema = new mongoose.Schema({
     address: { type: String, required: true },
     coordinates: { type: [Number], required: true } // [longitude, latitude]
   },
-  status: { type: String, enum: ['pending', 'accepted', 'completed', 'cancelled'], default: 'pending' },
+  status: { type: String, enum: requestStatuses, default: 'pending' },
   scheduledDate: { type: Date },
   priceEstimate: { type: Number }
 }, { timestamps: true });

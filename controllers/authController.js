@@ -1,61 +1,128 @@
-const User = require('../models/User');
-const Driver = require('../models/Driver');
-const Artisan = require('../models/Artisan');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { validationResult } = require('express-validator');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const Driver = require("../models/Driver");
+const Artisan = require("../models/Artisan");
+const VerificationCode = require("../models/VerificationCode");
+const { validationResult } = require("express-validator");
+const { sendVerificationEmail } = require("../lib/nodemailer");
 
-// Helper function to generate JWT token
 const generateToken = (userId, role) => {
-  return jwt.sign(
-    { id: userId, role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
-  );
+  return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "30d",
+  });
 };
 
-// @desc    Register a new user
+// @desc    إرسال رمز التحقق إلى البريد
+// @route   POST /api/auth/send-code
+// @access  Public
+exports.sendVerificationCode = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res
+        .status(400)
+        .json({ success: false, message: "البريد الإلكتروني مسجل مسبقاً" });
+    }
+
+    const code = Math.floor(10000 + Math.random() * 90000).toString(); 
+
+    await VerificationCode.deleteMany({ email }); 
+
+    await VerificationCode.create({ email, code });
+
+    sendVerificationEmail(email, code);
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
+      });
+  } catch (err) {
+    console.error("Error sending verification code:", err);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "فشل في إرسال رمز التحقق",
+        error: err.message,
+      });
+  }
+};
+
+// @desc    التحقق من رمز التحقق
+// @route   POST /api/auth/verify-code
+// @access  Public
+exports.verifyCode = async (req, res) => {
+  const { email, code } = req.body;
+
+  try {
+    const existingCode = await VerificationCode.findOne({ email, code });
+
+    if (!existingCode) {
+      return res.status(400).json({
+        success: false,
+        message: "رمز التحقق غير صحيح أو منتهي الصلاحية",
+      });
+    }
+
+    await VerificationCode.deleteMany({ email });
+
+    res.status(200).json({
+      success: true,
+      message: "تم التحقق من الرمز بنجاح",
+    });
+  } catch (err) {
+    console.error("Error verifying code:", err);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء التحقق من الرمز",
+      error: err.message,
+    });
+  }
+};
+
+// @desc    تسجيل مستخدم جديد
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    // 1) Validate input
+    const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({
+        success: false,
+        message: "أخطاء في البيانات المدخلة",
+        errors: errors.array(),
+      });
     }
 
     const { name, email, password, phone, address, gender, role } = req.body;
 
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'User already exists with this email' 
-      });
-    }
-
-    user = new User({
+    const user = new User({
       name,
       email,
-      password, 
+      password,
       phone,
       address,
       gender,
-      role
+      role,
     });
 
     await user.save();
 
-    if (role === 'driver') {
+    if (role === "driver") {
       const driver = new Driver({
         user: user._id,
-        ...req.body.driverDetails
+        ...req.body.work,
       });
       await driver.save();
-    } else if (role === 'artisan') {
+    } else if (role === "artisan") {
       const artisan = new Artisan({
         user: user._id,
-        ...req.body.artisanDetails
+        ...req.body.work,
       });
       await artisan.save();
     }
@@ -67,114 +134,112 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       success: true,
+      message: "تم التسجيل بنجاح",
       token,
-      data: userData
+      data: userData,
     });
-
   } catch (err) {
-    console.error('Registration Error:', err);
+    console.error("خطأ في التسجيل:", err);
     res.status(500).json({
       success: false,
-      message: 'Server error during registration',
-      error: err.message
+      message: "حدث خطأ أثناء التسجيل",
+      error: err.message,
     });
   }
 };
 
-// @desc    Login user
+// @desc    تسجيل الدخول
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1) Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
       });
     }
 
-    // 2) Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
       });
     }
 
-    // 3) Generate token
     const token = generateToken(user._id, user.role);
 
-    // 4) Get role-specific profile if exists
-    let profile = null;
-    if (user.role === 'driver') {
-      profile = await Driver.findOne({ user: user._id });
-    } else if (user.role === 'artisan') {
-      profile = await Artisan.findOne({ user: user._id });
+    let work = null;
+    if (user.role === "driver") {
+      work = await Driver.findOne({ user: user._id });
+    } else if (user.role === "artisan") {
+      work = await Artisan.findOne({ user: user._id });
     }
 
-    // 5) Send response (without password)
     const userData = user.toObject();
     delete userData.password;
 
+    const userWithWork = {
+      ...userData,
+      work: work ? work.toObject() : null,
+    };
+
     res.status(200).json({
       success: true,
+      message: "تم تسجيل الدخول بنجاح",
       token,
-      data: {
-        user: userData,
-        profile
-      }
+      data: userWithWork,
     });
-
   } catch (err) {
-    console.error('Login Error:', err);
+    console.error("خطأ في تسجيل الدخول:", err);
     res.status(500).json({
       success: false,
-      message: 'Server error during login',
-      error: err.message
+      message: "حدث خطأ أثناء تسجيل الدخول",
+      error: err.message,
     });
   }
 };
 
-// @desc    Get current user profile
+// @desc    الحصول على بيانات المستخدم الحالي
 // @route   GET /api/auth/me
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
-    
+    const user = await User.findById(req.user._id).select("-password");
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "المستخدم غير موجود",
       });
     }
 
-    let profile = null;
-    if (user.role === 'driver') {
-      profile = await Driver.findOne({ user: user._id });
-    } else if (user.role === 'artisan') {
-      profile = await Artisan.findOne({ user: user._id });
+    let work = null;
+    if (user.role === "driver") {
+      work = await Driver.findOne({ user: user._id });
+    } else if (user.role === "artisan") {
+      work = await Artisan.findOne({ user: user._id });
     }
+
+    const userWithWork = {
+      ...user.toObject(),
+      work: work ? work.toObject() : null,
+    };
 
     res.status(200).json({
       success: true,
-      data: {
-        user,
-        profile
-      }
+      data: userWithWork,
     });
-
   } catch (err) {
-    console.error('Get Profile Error:', err);
+    console.error("خطأ في جلب البيانات:", err);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching profile',
-      error: err.message
+      message: "حدث خطأ أثناء جلب بيانات المستخدم",
+      error: err.message,
     });
   }
 };

@@ -7,13 +7,15 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const { StatusCodes } = require('http-status-codes');
 
-// Initialize Express app
+// Import routes
+const authRoutes = require('./routes/authRoutes'); 
+
 const app = express();
 
 // ======================================
 // 🛡️ 1. Security & Middleware
 // ======================================
-app.use(helmet()); // Secure HTTP headers
+app.use(helmet()); 
 app.use(cors()); 
 // app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' })); 
 app.use(express.json())
@@ -27,7 +29,6 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Logging (skip in test mode)
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
@@ -52,7 +53,7 @@ mongoose.connect(MONGO_URI, {
 // ======================================
 // # 🚀 4. Routes
 // ======================================
-// app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth', authRoutes); 
 // app.use('/api/drivers', require('./routes/drivers'));
 // app.use('/api/artisans', require('./routes/artisans'));
 // app.use('/api/bookings', require('./routes/bookings'));
