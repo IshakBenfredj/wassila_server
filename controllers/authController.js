@@ -27,29 +27,25 @@ exports.sendVerificationCode = async (req, res) => {
         .json({ success: false, message: "البريد الإلكتروني مسجل مسبقاً" });
     }
 
-    const code = Math.floor(10000 + Math.random() * 90000).toString(); 
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
 
-    await VerificationCode.deleteMany({ email }); 
+    await VerificationCode.deleteMany({ email });
 
     await VerificationCode.create({ email, code });
 
     sendVerificationEmail(email, code);
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
-      });
+    res.status(200).json({
+      success: true,
+      message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
+    });
   } catch (err) {
     console.error("Error sending verification code:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "فشل في إرسال رمز التحقق",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "فشل في إرسال رمز التحقق",
+      error: err.message,
+    });
   }
 };
 
@@ -99,7 +95,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    const { name, email, password, phone, address, gender, role } = req.body;
+    const { name, email, password, phone, address, gender, role, nationalId } =
+      req.body;
 
     const user = new User({
       name,
@@ -109,6 +106,7 @@ exports.register = async (req, res) => {
       address,
       gender,
       role,
+      nationalId,
     });
 
     await user.save();
@@ -157,7 +155,7 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({
+      return res.status(500).json({
         success: false,
         message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
       });
@@ -165,7 +163,7 @@ exports.login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
+      return res.status(500).json({
         success: false,
         message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
       });
@@ -185,8 +183,10 @@ exports.login = async (req, res) => {
 
     const userWithWork = {
       ...userData,
-      work: work ? work.toObject() : null,
+      ...(userData.role === 'driver' ? { driver: work } : { artisan: work }),
     };
+
+    console.log('userWithWork', userWithWork)
 
     res.status(200).json({
       success: true,
