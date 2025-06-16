@@ -53,7 +53,10 @@ export const userRoles = ["admin", "artisan", "driver", "client"];
 
 export const requestStatuses = [
   "pending",
-  "active",
   "completed",
   "cancelled",
+  "confirm",
+  "to_customer",
+  "waiting",
+  "in_trip",
 ];

@@ -98,7 +98,7 @@ exports.updateAvailability = async (req, res) => {
     }
 
     const driver = await Driver.findOneAndUpdate(
-      { user: req.user.id },
+      { user: req.user._id },
       { isAvailable },
       { new: true }
     );

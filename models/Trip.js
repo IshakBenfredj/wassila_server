@@ -9,7 +9,7 @@ const tripSchema = new mongoose.Schema(
   {
     driver: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Driver",
+      ref: "User",
       required: function () {
         return this.status !== "pending";
       },
@@ -46,14 +46,14 @@ const tripSchema = new mongoose.Schema(
       enum: transportTypes,
       required: true,
     },
-    vehicleType: {
+    vehicleType: [{
       type: String,
       enum: vehicleTypes,
-      required: true,
-    },
+    }],
     description: { type: String },
+    placesNumber: { type: Number, required: true, default : 1 },
+    price: { type: Number, required: true, default : 1000 },
     status: { type: String, enum: requestStatuses, default: "pending" },
-    price: { type: Number, required: true },
   },
   { timestamps: true }
 );

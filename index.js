@@ -12,6 +12,8 @@ const { setupSocket } = require("./socket");
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const driverRoutes = require("./routes/driverRoutes");
+const tripRoutes = require("./routes/tripRoutes");
 
 const app = express();
 
@@ -59,8 +61,8 @@ mongoose
 // ======================================
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-// app.use('/api/drivers', require('./routes/drivers'));
-// app.use('/api/artisans', require('./routes/artisans'));
+app.use('/api/drivers', driverRoutes);
+app.use('/api/trips', tripRoutes);
 // app.use('/api/bookings', require('./routes/bookings'));
 
 // ======================================
