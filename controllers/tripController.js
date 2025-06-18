@@ -1,4 +1,5 @@
 const Trip = require("../models/Trip");
+const Driver = require("../models/Driver");
 
 // @desc    إنشاء رحلة جديدة
 // @route   POST /api/trips
@@ -12,7 +13,10 @@ exports.createTrip = async (req, res) => {
     await trip.save();
     await trip.populate("client");
     if (trip.driver) {
-      await trip.populate("driver");
+      await trip.populate({
+      path: "driver",
+      populate: { path: "user" }
+      });
     }
     res.status(201).json({
       success: true,
@@ -41,7 +45,10 @@ exports.getTrips = async (req, res) => {
       $or: [{ status: "pending" }, { driver: userId }],
     })
       .populate("client")
-      .populate("driver");
+      .populate({
+      path: "driver",
+      populate: { path: "user" }
+      });
 
     res.status(200).json({
       success: true,
@@ -67,7 +74,10 @@ exports.getTripById = async (req, res) => {
     const { tripId } = req.params;
     const trip = await Trip.findById(tripId)
       .populate("client")
-      .populate("driver");
+      .populate({
+      path: "driver",
+      populate: { path: "user" }
+      });
 
     if (!trip) {
       return res.status(404).json({
@@ -97,13 +107,16 @@ exports.getTripById = async (req, res) => {
  */
 exports.getActiveTripByDriver = async (req, res) => {
   try {
-    const driverId = req.user._id;
+    const driver = await Driver.findOne({user : req.user._id})
     const trip = await Trip.findOne({
-      driver: driverId,
+      driver: driver._id,
       status: { $nin: ["pending", "completed", "cancelled"] },
     })
       .populate("client")
-      .populate("driver");
+      .populate({
+      path: "driver",
+      populate: { path: "user" }
+      });
 
     if (!trip) {
       return res.json({
@@ -129,15 +142,26 @@ exports.getActiveTripByDriver = async (req, res) => {
 // @route   PUT /api/trips/:tripId/status
 // @access  Private
 exports.changeStatus = async (req, res) => {
-  console.log("start change status");
-
   try {
     const { tripId } = req.params;
     const { status, driver } = req.body;
 
+    // Get the current trip first to check previous status
+    const currentTrip = await Trip.findById(tripId);
+    if (!currentTrip) {
+      return res.status(404).json({
+        success: false,
+        message: "الرحلة غير موجودة",
+      });
+    }
+
     // Prepare update object
     const update = { status };
-    if (driver !== undefined) {
+
+    // Handle driver assignment/removal based on status
+    if (status === "cancelled" && currentTrip.status !== "in_trip") {
+      update.driver = null;
+    } else if (driver !== undefined) {
       update.driver = driver;
     }
 
@@ -146,7 +170,10 @@ exports.changeStatus = async (req, res) => {
       runValidators: true,
     })
       .populate("client")
-      .populate("driver");
+      .populate({
+      path: "driver",
+      populate: { path: "user" }
+      });
 
     if (!trip) {
       return res.status(404).json({
@@ -155,9 +182,17 @@ exports.changeStatus = async (req, res) => {
       });
     }
 
+    // Customize success message based on status
+    let successMessage = "تم تحديث حالة الرحلة بنجاح";
+    if (status === "completed") {
+      successMessage = "تم إكمال الرحلة بنجاح";
+    } else if (status === "cancelled") {
+      successMessage = "تم إلغاء الرحلة بنجاح";
+    }
+
     res.status(200).json({
       success: true,
-      message: "تم تحديث حالة الرحلة بنجاح",
+      message: successMessage,
       data: trip,
     });
   } catch (err) {

@@ -14,6 +14,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const driverRoutes = require("./routes/driverRoutes");
 const tripRoutes = require("./routes/tripRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/reviews', reviewRoutes);
 // app.use('/api/bookings', require('./routes/bookings'));
 
 // ======================================

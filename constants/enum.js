@@ -59,4 +59,5 @@ export const requestStatuses = [
   "to_customer",
   "waiting",
   "in_trip",
+  "payment",
 ];
