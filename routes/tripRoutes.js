@@ -6,7 +6,7 @@ const router = express.Router();
 // Create New Trip
 router.post("/", protect, tripController.createTrip);
 router.get("/", protect, tripController.getTrips);
-router.get("/active", protect, tripController.getActiveTripByDriver);
+router.get("/active", protect, tripController.getActiveTrip);
 router.get("/:tripId", protect, tripController.getTripById);
 
 // Change Status of trip

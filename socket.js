@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 
 let availableDrivers = [];
 let trips = [];
+let connectedClients = [];
 
 function setupSocket(server) {
   const io = new Server(server, {
@@ -41,6 +42,13 @@ function setupSocket(server) {
       callback(availableDrivers);
     });
 
+    socket.on("getDriverById", (driverId, callback) => {
+      const driver = availableDrivers.find((d) => d._id === driverId);
+      if (typeof callback === "function") {
+        callback(driver);
+      }
+    });
+
     socket.on("updateLocation", (data) => {
       const { driverId, coords } = data;
 
@@ -48,7 +56,30 @@ function setupSocket(server) {
       if (driverIndex !== -1) {
         availableDrivers[driverIndex].location = coords;
         availableDrivers[driverIndex].updatedAt = new Date().toISOString();
+
+        io.emit("driverLocationUpdated", {
+          driverId,
+          location: coords,
+          updatedAt: availableDrivers[driverIndex].updatedAt,
+        });
       }
+    });
+
+    // Client
+    socket.on("clientConnected", (data) => {
+      const { clientId, name, image } = data;
+
+      connectedClients = connectedClients.filter((c) => c._id !== clientId);
+
+      connectedClients.push({
+        _id: clientId,
+        name,
+        image,
+        socketId: socket.id,
+        connectedAt: new Date().toISOString(),
+      });
+
+      console.log(`✅ Client connected: ${name} (${clientId})`);
     });
 
     // Trip
@@ -56,31 +87,69 @@ function setupSocket(server) {
       trips = trips.filter((t) => t._id !== tripData._id);
 
       const newTrip = {
-      ...tripData,
-      socketId: socket.id,
+        ...tripData,
+        socketId: socket.id,
       };
 
       trips.push(newTrip);
+      io.emit("newTrip", newTrip);
       console.log("🆕 New trip created:", newTrip);
     });
 
     socket.on("getTrips", (callback) => {
-      callback(trips);
+      if (typeof callback === "function") {
+        callback(trips);
+      }
+    });
+
+    socket.on("getTripByClientId", (clientId, callback) => {
+      const filteredTrips = trips.filter(
+        (t) =>
+          t.client._id === clientId &&
+          !["completed", "cancelled"].includes(t.status)
+      );
+      console.log("filteredTrips ........", filteredTrips);
+      callback(filteredTrips[0]);
     });
 
     socket.on("updateTrip", (data) => {
       const tripIndex = trips.findIndex((t) => t._id === data._id);
       if (tripIndex !== -1) {
-      trips[tripIndex] = { ...trips[tripIndex], ...data };
-      // console.log(`🔄 Trip updated:`, trips[tripIndex]);
+        trips[tripIndex] = { ...trips[tripIndex], ...data };
+
+        io.emit("updateTrip", trips[tripIndex]);
       }
     });
 
+    // Calls
+    socket.on("callClient", ({ clientId, offer }) => {
+      const client = connectedClients.find((c) => c._id === clientId);
+      if (client?.socketId) {
+        io.to(client.socketId).emit("incomingCall", {
+          offer,
+          from: socket.id,
+        });
+      }
+    });
+
+    socket.on("callAccepted", ({ answer, toSocketId }) => {
+      io.to(toSocketId).emit("callAccepted", { answer });
+    });
+
+    socket.on("ice-candidate", (candidate) => {
+      socket.broadcast.emit("ice-candidate", candidate);
+    });
+
+    // Disconnect
     socket.on("disconnect", () => {
       console.log(`❌ Socket disconnected: ${socket.id}`);
-      // availableDrivers = availableDrivers.filter(
-      //   (d) => d.socketId !== socket.id
-      // );
+      availableDrivers = availableDrivers.filter(
+        (d) => d.socketId !== socket.id
+      );
+
+      connectedClients = connectedClients.filter(
+        (c) => c.socketId !== socket.id
+      );
     });
   });
 }

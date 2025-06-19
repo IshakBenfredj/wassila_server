@@ -14,8 +14,8 @@ exports.createTrip = async (req, res) => {
     await trip.populate("client");
     if (trip.driver) {
       await trip.populate({
-      path: "driver",
-      populate: { path: "user" }
+        path: "driver",
+        populate: { path: "user" },
       });
     }
     res.status(201).json({
@@ -34,21 +34,33 @@ exports.createTrip = async (req, res) => {
 };
 
 /**
- * @desc    الحصول على جميع الرحلات ذات الحالة "pending" أو الرحلات التي يكون فيها السائق هو المستخدم الحالي
+ * @desc
  * @route   GET /api/trips
  * @access  Private
  */
 exports.getTrips = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const trips = await Trip.find({
-      $or: [{ status: "pending" }, { driver: userId }],
-    })
+    let filter = {};
+    if (req.user.role === "driver") {
+      const driver = await Driver.findOne({ user: req.user._id });
+      if (!driver) {
+        return res.status(404).json({
+          success: false,
+          message: "السائق غير موجود",
+        });
+      }
+      filter.driver = driver._id;
+    } else {
+      filter.client = req.user._id;
+    }
+
+    const trips = await Trip.find(filter)
       .populate("client")
       .populate({
-      path: "driver",
-      populate: { path: "user" }
-      });
+        path: "driver",
+        populate: { path: "user" },
+      })
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -75,8 +87,8 @@ exports.getTripById = async (req, res) => {
     const trip = await Trip.findById(tripId)
       .populate("client")
       .populate({
-      path: "driver",
-      populate: { path: "user" }
+        path: "driver",
+        populate: { path: "user" },
       });
 
     if (!trip) {
@@ -105,18 +117,31 @@ exports.getTripById = async (req, res) => {
  * @route   GET /api/trips/active
  * @access  Private
  */
-exports.getActiveTripByDriver = async (req, res) => {
+exports.getActiveTrip = async (req, res) => {
   try {
-    const driver = await Driver.findOne({user : req.user._id})
-    const trip = await Trip.findOne({
-      driver: driver._id,
-      status: { $nin: ["pending", "completed", "cancelled"] },
-    })
-      .populate("client")
-      .populate({
-      path: "driver",
-      populate: { path: "user" }
-      });
+    let trip;
+    if (req.user.role === "driver") {
+      const driver = await Driver.findOne({ user: req.user._id });
+      trip = await Trip.findOne({
+        driver: driver._id,
+        status: { $nin: ["pending", "completed", "cancelled"] },
+      })
+        .populate("client")
+        .populate({
+          path: "driver",
+          populate: { path: "user" },
+        });
+    } else {
+      trip = await Trip.findOne({
+        client: req.user._id,
+        status: { $nin: ["completed", "cancelled"] },
+      })
+        .populate("client")
+        .populate({
+          path: "driver",
+          populate: { path: "user" },
+        });
+    }
 
     if (!trip) {
       return res.json({
@@ -171,8 +196,8 @@ exports.changeStatus = async (req, res) => {
     })
       .populate("client")
       .populate({
-      path: "driver",
-      populate: { path: "user" }
+        path: "driver",
+        populate: { path: "user" },
       });
 
     if (!trip) {

@@ -20,7 +20,7 @@ exports.sendVerificationCode = async (req, res) => {
   const { email } = req.body;
 
   try {
-    const userExists = await User.findOne({ email : email.toLowerCase() });
+    const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
       return res
         .status(400)
@@ -29,9 +29,9 @@ exports.sendVerificationCode = async (req, res) => {
 
     const code = Math.floor(10000 + Math.random() * 90000).toString();
 
-    await VerificationCode.deleteMany({ email : email.toLowerCase() });
+    await VerificationCode.deleteMany({ email: email.toLowerCase() });
 
-    await VerificationCode.create({ email : email.toLowerCase(), code });
+    await VerificationCode.create({ email: email.toLowerCase(), code });
 
     sendVerificationEmail(email, code);
 
@@ -56,7 +56,10 @@ exports.verifyCode = async (req, res) => {
   const { email, code } = req.body;
 
   try {
-    const existingCode = await VerificationCode.findOne({ email : email.toLowerCase(), code });
+    const existingCode = await VerificationCode.findOne({
+      email: email.toLowerCase(),
+      code,
+    });
 
     if (!existingCode) {
       return res.status(400).json({
@@ -65,7 +68,7 @@ exports.verifyCode = async (req, res) => {
       });
     }
 
-    await VerificationCode.deleteMany({ email : email.toLowerCase() });
+    await VerificationCode.deleteMany({ email: email.toLowerCase() });
 
     res.status(200).json({
       success: true,
@@ -117,12 +120,14 @@ exports.register = async (req, res) => {
         ...req.body.driver,
       });
       await driver.save();
+      await user.populate("driver");
     } else if (role === "artisan") {
       const artisan = new Artisan({
         user: user._id,
         ...req.body.artisan,
       });
       await artisan.save();
+      await user.populate("artisan");
     }
 
     const token = generateToken(user._id, user.role);
@@ -153,9 +158,9 @@ exports.login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    const user = await User.findOne({ 
-      email : email.toLowerCase(),
-      role: { $in: Array.isArray(role) ? role : [role] } 
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      role: { $in: Array.isArray(role) ? role : [role] },
     });
     if (!user) {
       return res.status(500).json({
@@ -186,10 +191,10 @@ exports.login = async (req, res) => {
 
     const userWithWork = {
       ...userData,
-      ...(userData.role === 'driver' ? { driver: work } : { artisan: work }),
+      ...(userData.role === "driver" ? { driver: work } : { artisan: work }),
     };
 
-    console.log('userWithWork', userWithWork)
+    console.log("userWithWork", userWithWork);
 
     res.status(200).json({
       success: true,
