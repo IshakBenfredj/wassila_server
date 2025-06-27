@@ -13,6 +13,7 @@ const { setupSocket } = require("./socket");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const driverRoutes = require("./routes/driverRoutes");
+const artisanRoutes = require("./routes/artisanRoutes");
 const tripRoutes = require("./routes/tripRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 
@@ -63,6 +64,7 @@ mongoose
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/artisans', artisanRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/reviews', reviewRoutes);
 // app.use('/api/bookings', require('./routes/bookings'));

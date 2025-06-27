@@ -1,5 +1,6 @@
 const Trip = require("../models/Trip");
 const Driver = require("../models/Driver");
+const CancelledTrip = require("../models/CancelledTrip");
 
 // @desc    إنشاء رحلة جديدة
 // @route   POST /api/trips
@@ -169,7 +170,7 @@ exports.getActiveTrip = async (req, res) => {
 exports.changeStatus = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const { status, driver } = req.body;
+    const { status, driver, reason } = req.body;
 
     // Get the current trip first to check previous status
     const currentTrip = await Trip.findById(tripId);
@@ -180,13 +181,22 @@ exports.changeStatus = async (req, res) => {
       });
     }
 
-    // Prepare update object
     const update = { status };
 
-    // Handle driver assignment/removal based on status
-    if (status === "cancelled" && currentTrip.status !== "in_trip") {
-      update.driver = null;
-    } else if (driver !== undefined) {
+    if (status === "cancelled") {
+      const cancelledTrip = new CancelledTrip({
+        trip: tripId,
+        cancelledBy: req.user._id,
+        reason: reason || "تم الإلغاء بعد بدء الرحلة",
+      });
+      if (currentTrip.status !== "in_trip") {
+        update.driver = null;
+        update.status === "pending";
+      }
+      await cancelledTrip.save();
+    }
+
+    if (driver !== undefined) {
       update.driver = driver;
     }
 

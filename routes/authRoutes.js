@@ -28,6 +28,6 @@ router.post(
 );
 
 // Get profile
-router.get('/me', protect, authController.getMe);
+router.get('/me', authController.getMe);
 
 module.exports = router;

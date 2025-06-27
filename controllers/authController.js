@@ -114,26 +114,26 @@ exports.register = async (req, res) => {
 
     await user.save();
 
-    if (role === "driver") {
+    const userData = user.toObject();
+    delete userData.password;
+
+    if (role === "driver") { 
       const driver = new Driver({
         user: user._id,
         ...req.body.driver,
       });
       await driver.save();
-      await user.populate("driver");
+      userData.driver = driver
     } else if (role === "artisan") {
       const artisan = new Artisan({
         user: user._id,
         ...req.body.artisan,
       });
       await artisan.save();
-      await user.populate("artisan");
+      userData.artisan = artisan
     }
 
     const token = generateToken(user._id, user.role);
-
-    const userData = user.toObject();
-    delete userData.password;
 
     res.status(201).json({
       success: true,
@@ -217,8 +217,24 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password");
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.json({
+        success: false,
+      });
+    }
 
+    const token = authHeader.split(" ")[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.json({
+        success: false,
+      });
+    }
+
+    const user = await User.findById(decoded.id).select("-password");
     if (!user) {
       return res.status(404).json({
         success: false,
