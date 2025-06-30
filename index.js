@@ -16,8 +16,10 @@ const driverRoutes = require("./routes/driverRoutes");
 const artisanRoutes = require("./routes/artisanRoutes");
 const tripRoutes = require("./routes/tripRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const job = require("./lib/cron");
 
 const app = express();
+job.start();
 
 // ======================================
 // 🛡️ 1. Security & Middleware

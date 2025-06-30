@@ -9,10 +9,7 @@ const tripSchema = new mongoose.Schema(
   {
     driver: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Driver",
-      required: function () {
-        return this.status !== "pending";
-      },
+      ref: "Driver"
     },
     client: {
       type: mongoose.Schema.Types.ObjectId,

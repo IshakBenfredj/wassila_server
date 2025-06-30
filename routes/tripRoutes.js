@@ -7,6 +7,7 @@ const router = express.Router();
 router.post("/", protect, tripController.createTrip);
 router.get("/", protect, tripController.getTrips);
 router.get("/active", protect, tripController.getActiveTrip);
+router.get("/cancelled-trips", protect, tripController.getCancelledTrips);
 router.get("/:tripId", protect, tripController.getTripById);
 
 // Change Status of trip

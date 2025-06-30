@@ -172,7 +172,6 @@ exports.changeStatus = async (req, res) => {
     const { tripId } = req.params;
     const { status, driver, reason } = req.body;
 
-    // Get the current trip first to check previous status
     const currentTrip = await Trip.findById(tripId);
     if (!currentTrip) {
       return res.status(404).json({
@@ -189,10 +188,10 @@ exports.changeStatus = async (req, res) => {
         cancelledBy: req.user._id,
         reason: reason || "تم الإلغاء بعد بدء الرحلة",
       });
-      if (currentTrip.status !== "in_trip") {
-        update.driver = null;
-        update.status === "pending";
-      }
+      // update.driver = null;
+      // if (currentTrip.status !== "in_trip") {
+      //   // update.status = "pending";
+      // }
       await cancelledTrip.save();
     }
 
@@ -200,15 +199,32 @@ exports.changeStatus = async (req, res) => {
       update.driver = driver;
     }
 
-    const trip = await Trip.findByIdAndUpdate(tripId, update, {
-      new: true,
-      runValidators: true,
-    })
+    let trip;
+    if (update.driver) {
+      trip = await Trip.findByIdAndUpdate(
+      tripId,
+      update,
+      {
+        new: true,
+        runValidators: true,
+      }
+      )
       .populate("client")
       .populate({
         path: "driver",
         populate: { path: "user" },
       });
+    } else {
+      trip = await Trip.findByIdAndUpdate(
+      tripId,
+      update,
+      {
+        new: true,
+        runValidators: true,
+      }
+      )
+      .populate("client");
+    }
 
     if (!trip) {
       return res.status(404).json({
@@ -235,6 +251,53 @@ exports.changeStatus = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "حدث خطأ أثناء تغيير حالة الرحلة",
+      error: err.message,
+    });
+  }
+};
+
+
+/**
+ * @desc    الحصول على الرحلات الملغاة الخاصة بالمستخدم الحالي (عميل أو سائق)
+ * @route   GET /api/trips/cancelled-trips
+ * @access  Private
+ */
+exports.getCancelledTrips = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Find cancelled trips where the user is either the client or the driver
+    const cancelledTrips = await CancelledTrip.find()
+      .populate({
+        path: "trip",
+        populate: [
+          { path: "client" },
+          { 
+            path: "driver",
+            populate: { path: "user" }
+          }
+        ]
+      })
+      .populate("cancelledBy")
+      .sort({ createdAt: -1 });
+
+    // Filter trips where the user is the client or the driver.user
+    const filtered = cancelledTrips.filter(ct => {
+      if (!ct.trip) return false;
+      if (ct.trip.client && ct.trip.client._id.equals(userId)) return true;
+      if (ct.trip.driver && ct.trip.driver.user && ct.trip.driver.user._id.equals(userId)) return true;
+      return false;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: filtered,
+    });
+  } catch (err) {
+    console.error("خطأ في جلب الرحلات الملغاة:", err);
+    res.status(400).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب الرحلات الملغاة",
       error: err.message,
     });
   }
