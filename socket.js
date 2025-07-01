@@ -3,6 +3,7 @@ const { Server } = require("socket.io");
 let availableDrivers = [];
 let trips = [];
 let connectedClients = [];
+let notifications = [];
 
 function setupSocket(server) {
   const io = new Server(server, {
@@ -140,6 +141,25 @@ function setupSocket(server) {
       socket.broadcast.emit("ice-candidate", candidate);
     });
 
+    // Notification
+    socket.on("sendNotification", (notification) => {
+      const newNotif = {
+        _id: notification._id,
+        user: notification.user,
+        fromUser: notification.fromUser,
+        title: notification.title,
+        body: notification.body,
+        type: notification.type,
+        isRead: false,
+        createdAt: notification.createdAt || new Date().toISOString(),
+      };
+
+      notifications.push(newNotif);
+      io.emit("newNotification", newNotif);
+
+      console.log("📢 Notification emitted (not saved):", newNotif);
+    });
+
     // Disconnect
     socket.on("disconnect", () => {
       console.log(`❌ Socket disconnected: ${socket.id}`);
@@ -152,6 +172,7 @@ function setupSocket(server) {
       );
     });
   });
+
 }
 
 module.exports = {

@@ -16,10 +16,13 @@ const driverRoutes = require("./routes/driverRoutes");
 const artisanRoutes = require("./routes/artisanRoutes");
 const tripRoutes = require("./routes/tripRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const addressRoutes = require("./routes/addressRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+
 const job = require("./lib/cron");
 
 const app = express();
-job.start();
+// job.start();
 
 // ======================================
 // 🛡️ 1. Security & Middleware
@@ -65,11 +68,12 @@ mongoose
 // ======================================
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/artisans', artisanRoutes);
-app.use('/api/trips', tripRoutes);
-app.use('/api/reviews', reviewRoutes);
-// app.use('/api/bookings', require('./routes/bookings'));
+app.use("/api/drivers", driverRoutes);
+app.use("/api/artisans", artisanRoutes);
+app.use("/api/trips", tripRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/addresses", addressRoutes);
+app.use('/api/notifications', notificationRoutes)
 
 // ======================================
 // # 🩺 5. Health Check Endpoint

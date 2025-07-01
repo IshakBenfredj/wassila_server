@@ -7,6 +7,7 @@ const CancelledTrip = require("../models/CancelledTrip");
 // @access  Private
 exports.createTrip = async (req, res) => {
   try {
+    const io = req.app.get("io");
     const trip = new Trip({
       client: req.user._id,
       ...req.body,
@@ -19,6 +20,7 @@ exports.createTrip = async (req, res) => {
         populate: { path: "user" },
       });
     }
+
     res.status(201).json({
       success: true,
       message: "تم إنشاء الرحلة بنجاح",
@@ -201,29 +203,20 @@ exports.changeStatus = async (req, res) => {
 
     let trip;
     if (update.driver) {
-      trip = await Trip.findByIdAndUpdate(
-      tripId,
-      update,
-      {
+      trip = await Trip.findByIdAndUpdate(tripId, update, {
         new: true,
         runValidators: true,
-      }
-      )
-      .populate("client")
-      .populate({
-        path: "driver",
-        populate: { path: "user" },
-      });
+      })
+        .populate("client")
+        .populate({
+          path: "driver",
+          populate: { path: "user" },
+        });
     } else {
-      trip = await Trip.findByIdAndUpdate(
-      tripId,
-      update,
-      {
+      trip = await Trip.findByIdAndUpdate(tripId, update, {
         new: true,
         runValidators: true,
-      }
-      )
-      .populate("client");
+      }).populate("client");
     }
 
     if (!trip) {
@@ -256,7 +249,6 @@ exports.changeStatus = async (req, res) => {
   }
 };
 
-
 /**
  * @desc    الحصول على الرحلات الملغاة الخاصة بالمستخدم الحالي (عميل أو سائق)
  * @route   GET /api/trips/cancelled-trips
@@ -272,20 +264,25 @@ exports.getCancelledTrips = async (req, res) => {
         path: "trip",
         populate: [
           { path: "client" },
-          { 
+          {
             path: "driver",
-            populate: { path: "user" }
-          }
-        ]
+            populate: { path: "user" },
+          },
+        ],
       })
       .populate("cancelledBy")
       .sort({ createdAt: -1 });
 
     // Filter trips where the user is the client or the driver.user
-    const filtered = cancelledTrips.filter(ct => {
+    const filtered = cancelledTrips.filter((ct) => {
       if (!ct.trip) return false;
       if (ct.trip.client && ct.trip.client._id.equals(userId)) return true;
-      if (ct.trip.driver && ct.trip.driver.user && ct.trip.driver.user._id.equals(userId)) return true;
+      if (
+        ct.trip.driver &&
+        ct.trip.driver.user &&
+        ct.trip.driver.user._id.equals(userId)
+      )
+        return true;
       return false;
     });
 
