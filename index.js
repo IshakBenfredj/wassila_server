@@ -22,7 +22,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const job = require("./lib/cron");
 
 const app = express();
-// job.start();
+job.start();
 
 // ======================================
 // 🛡️ 1. Security & Middleware
