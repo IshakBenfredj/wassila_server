@@ -61,3 +61,54 @@ exports.updateArtisanProfile = async (req, res) => {
     });
   }
 };
+
+exports.getArtisanById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const artisan = await Artisan.findById(id).populate("user");
+    if (!artisan) {
+      return res.status(404).json({
+        success: false,
+        message: "لم يتم العثور على الحرفي",
+      });
+    }
+    res.status(200).json({
+      success: true,
+      data: artisan,
+    });
+  } catch (error) {
+    console.error("خطأ أثناء جلب بيانات الحرفي:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب بيانات الحرفي",
+      error: error.message,
+    });
+  }
+};
+
+exports.searchArtisans = async (req, res) => {
+  try {
+    const { wilaya, professions } = req.body;
+
+    if (!wilaya || !Array.isArray(professions) || professions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "يرجى تحديد الولاية والمهن المطلوبة",
+      });
+    }
+
+    const artisans = await Artisan.find({
+      wilayat: wilaya,
+      professions: { $all: professions },
+    }).populate("user", "name phone email image");
+
+    res.status(200).json({ data: artisans });
+  } catch (error) {
+    console.error("خطأ أثناء البحث عن الحرفيين:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب الحرفيين",
+      error: error.message,
+    });
+  }
+};
