@@ -30,15 +30,58 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    maxPrice: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    images: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected", "completed", "canceled"],
       default: "pending",
-    }
+    },
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      virtuals: true,
+    },
   }
 );
+
+orderSchema.index({ client: 1 });
+orderSchema.index({ artisan: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ professions: 1 });
+orderSchema.index({ wilaya: 1 });
+orderSchema.index({ createdAt: -1 });
+
+orderSchema.virtual("formattedDate").get(function () {
+  return this.createdAt.toLocaleDateString("ar-DZ", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+});
+
+orderSchema.pre("save", function (next) {
+  if (this.maxPrice && this.maxPrice < 0) {
+    throw new Error("السعر الأقصى يجب أن يكون رقمًا موجبًا");
+  }
+  next();
+});
 
 module.exports = mongoose.model("Order", orderSchema);

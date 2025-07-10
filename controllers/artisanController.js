@@ -65,7 +65,7 @@ exports.updateArtisanProfile = async (req, res) => {
 exports.getArtisanById = async (req, res) => {
   try {
     const { id } = req.params;
-    const artisan = await Artisan.findById(id).populate("user");
+    const artisan = await Artisan.findOne({ user: id }).populate("user");
     if (!artisan) {
       return res.status(404).json({
         success: false,
