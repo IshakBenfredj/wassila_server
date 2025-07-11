@@ -20,6 +20,7 @@ const addressRoutes = require("./routes/addressRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const portfolioRoutes = require("./routes/portfolioRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const offerRoutes = require("./routes/offerRoutes");
 
 const job = require("./lib/cron");
 
@@ -78,6 +79,7 @@ app.use("/api/addresses", addressRoutes);
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/portfolios', portfolioRoutes)
 app.use('/api/orders', orderRoutes)
+app.use('/api/offers', offerRoutes)
 
 // ======================================
 // # 🩺 5. Health Check Endpoint
