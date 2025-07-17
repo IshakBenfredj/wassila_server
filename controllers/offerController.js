@@ -24,6 +24,8 @@ exports.createOffer = async (req, res) => {
       description,
     });
 
+    await offer.populate("artisan");
+
     res.status(201).json({
       success: true,
       message: "تم إرسال العرض بنجاح",
@@ -40,7 +42,7 @@ exports.getOffersForOrder = async (req, res) => {
     const orderId = req.params.orderId;
 
     const offers = await Offer.find({ order: orderId })
-      .populate("artisan", "name avatar")
+      .populate("artisan")
       .sort({ createdAt: -1 });
 
     res.status(200).json(offers);

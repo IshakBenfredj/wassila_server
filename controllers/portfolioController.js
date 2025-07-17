@@ -44,8 +44,9 @@ exports.createPortfolio = async (req, res) => {
 // @route   GET /api/portfolios
 // @access  Private
 exports.getPortfolios = async (req, res) => {
+  const userId = req.params.id || req.user._id;
   try {
-    const portfolios = await Portfolio.find({ user: req.params.id }).sort({
+    const portfolios = await Portfolio.find({ user: userId }).sort({
       createdAt: -1,
     });
 

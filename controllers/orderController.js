@@ -5,6 +5,8 @@ const Artisan = require("../models/Artisan");
 const Offer = require("../models/Offer");
 
 exports.createOrder = async (req, res) => {
+  console.log("🚀 Creating new order...");
+
   try {
     const {
       artisan,
@@ -16,30 +18,41 @@ exports.createOrder = async (req, res) => {
       images,
     } = req.body;
 
-    if (
-      !professions ||
-      !Array.isArray(professions) ||
-      professions.length === 0
-    ) {
+    console.log("📦 Request Body:", {
+      artisan,
+      professions,
+      wilaya,
+      address,
+      description,
+      maxPrice,
+      imageCount: images?.length || 0,
+    });
+
+    // ✅ Validation
+    if (!professions || !Array.isArray(professions) || professions.length === 0) {
+      console.warn("❌ Missing professions");
       return res.status(400).json({ message: "يرجى تحديد المهن المطلوبة" });
     }
 
     if (!wilaya || !address || !description) {
-      return res
-        .status(400)
-        .json({ message: "الرجاء ملء جميع الحقول المطلوبة" });
+      console.warn("❌ Missing required fields");
+      return res.status(400).json({ message: "الرجاء ملء جميع الحقول المطلوبة" });
     }
 
+    // ✅ Upload images
     let imageUrls = [];
     if (images && images.length > 0) {
+      console.log("🖼 Uploading images...");
       try {
         imageUrls = await uploadMultipleImages(images, "orders");
+        console.log("✅ Images uploaded:", imageUrls.length);
       } catch (uploadError) {
-        console.error("Error uploading images:", uploadError);
+        console.error("❌ Error uploading images:", uploadError);
         return res.status(500).json({ message: "حدث خطأ أثناء رفع الصور" });
       }
     }
 
+    // ✅ Create order
     const newOrder = await Order.create({
       client: req.user._id,
       artisan: artisan || null,
@@ -51,13 +64,15 @@ exports.createOrder = async (req, res) => {
       images: imageUrls,
     });
 
+    console.log("✅ Order created successfully:", newOrder._id);
+
     res.status(201).json({
       success: true,
       message: "تم إنشاء الطلب بنجاح",
       data: newOrder,
     });
   } catch (error) {
-    console.error("خطأ أثناء إنشاء الطلب:", error);
+    console.error("❌ خطأ أثناء إنشاء الطلب:", error);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء إنشاء الطلب",
@@ -65,6 +80,7 @@ exports.createOrder = async (req, res) => {
     });
   }
 };
+
 
 exports.getOrderById = async (req, res) => {
   try {
@@ -205,7 +221,7 @@ exports.getOrdersForArtisan = async (req, res) => {
       },
       {
         $project: {
-          offers: 0, 
+          offers: 0,
         },
       },
     ]);
@@ -219,6 +235,164 @@ exports.getOrdersForArtisan = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء جلب الطلبات للحرفي",
+      error: error.message,
+    });
+  }
+};
+
+exports.acceptOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { artisan } = req.body;
+    const userId = req.user._id;
+
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ message: "الطلب غير موجود" });
+    }
+
+    if (order.client.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "لا يمكنك تعديل هذا الطلب" });
+    }
+
+    if (
+      ["accepted", "rejected", "canceled", "completed"].includes(order.status)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "لا يمكن تعديل حالة الطلب الحالية" });
+    }
+
+    if (!order.artisan && !artisan) {
+      return res.status(400).json({ message: "يرجى تحديد الحرفي" });
+    }
+
+    order.status = "accepted";
+    if (!order.artisan && artisan) {
+      order.artisan = artisan;
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "تم قبول العرض بنجاح",
+      data: order,
+    });
+  } catch (error) {
+    console.error("خطأ أثناء قبول العرض:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء قبول العرض",
+      error: error.message,
+    });
+  }
+};
+
+exports.rejectOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const artisanId = req.user._id;
+
+    if (!reason) {
+      return res.status(400).json({ message: "يرجى تقديم سبب الرفض" });
+    }
+
+    const order = await Order.findById(id);
+
+    if (
+      !order ||
+      !order.artisan ||
+      order.artisan.toString() !== artisanId.toString()
+    ) {
+      return res.status(403).json({ message: "لا يمكنك رفض هذا الطلب" });
+    }
+
+    if (["rejected", "canceled", "completed"].includes(order.status)) {
+      return res
+        .status(400)
+        .json({ message: "لا يمكن تعديل حالة الطلب الحالية" });
+    }
+
+    order.status = "rejected";
+    order.cancellation = {
+      reason,
+      cancelledBy: "artisan",
+      type: "rejected",
+      date: new Date(),
+    };
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "تم رفض الطلب بنجاح",
+      data: order,
+    });
+  } catch (error) {
+    console.error("خطأ أثناء رفض الطلب:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء رفض الطلب",
+      error: error.message,
+    });
+  }
+};
+
+exports.cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.user._id;
+
+    if (!reason) {
+      return res.status(400).json({ message: "يرجى تقديم سبب الإلغاء" });
+    }
+
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ message: "الطلب غير موجود" });
+    }
+
+    const isClient = order.client.toString() === userId.toString();
+    const isArtisan =
+      order.artisan && order.artisan.toString() === userId.toString();
+
+    if (!isClient && !isArtisan) {
+      return res
+        .status(403)
+        .json({ message: "لا تملك صلاحية إلغاء هذا الطلب" });
+    }
+
+    if (["rejected", "canceled", "completed"].includes(order.status)) {
+      return res
+        .status(400)
+        .json({ message: "لا يمكن تعديل حالة الطلب الحالية" });
+    }
+
+    order.status = "canceled";
+    order.cancellation = {
+      reason,
+      cancelledBy: isClient ? "client" : "artisan",
+      type: "canceled",
+      date: new Date(),
+    };
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "تم إلغاء الطلب بنجاح",
+      data: order,
+    });
+  } catch (error) {
+    console.error("خطأ أثناء إلغاء الطلب:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء إلغاء الطلب",
       error: error.message,
     });
   }

@@ -1,5 +1,12 @@
 const mongoose = require("mongoose");
 
+const CancellationSchema = new mongoose.Schema({
+  reason: { type: String, required: true },
+  cancelledBy: { type: String, enum: ["artisan", "client"], required: true },
+  type: { type: String, enum: ["rejected", "canceled"], required: true },
+  date: { type: Date, default: Date.now },
+});
+
 const orderSchema = new mongoose.Schema(
   {
     client: {
@@ -46,6 +53,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "accepted", "rejected", "completed", "canceled"],
       default: "pending",
     },
+    cancellation: CancellationSchema,
   },
   {
     timestamps: true,
