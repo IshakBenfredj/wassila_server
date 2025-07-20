@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 
@@ -55,7 +56,9 @@ exports.updateProfile = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    console.log("start change password ==============############################");
+    console.log(
+      "start change password ==============############################"
+    );
     // 1) Get user
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -107,6 +110,105 @@ exports.deleteAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء حذف الحساب",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get full user profile data
+// @route   GET /api/users/profile
+// @access  Private
+exports.getUserProfileData = async (req, res) => {
+  try {
+    const userId = req.params.userId || req.user._id;
+    const objectId = new mongoose.Types.ObjectId(userId);
+
+    const [userData] = await User.aggregate([
+      { $match: { _id: objectId } },
+      {
+        $lookup: {
+          from: "trips",
+          localField: "_id",
+          foreignField: "client",
+          as: "trips",
+        },
+      },
+      {
+        $lookup: {
+          from: "orders",
+          localField: "_id",
+          foreignField: "client",
+          as: "orders",
+        },
+      },
+      {
+        $lookup: {
+          from: "reviews",
+          let: { userId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$reviewedUser", "$$userId"] } } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "reviewer",
+                foreignField: "_id",
+                as: "reviewer",
+              },
+            },
+            {
+              $unwind: "$reviewer",
+            },
+            {
+              $project: {
+                stars: 1,
+                comment: 1,
+                createdAt: 1,
+                reviewer: {
+                  name: "$reviewer.name",
+                  image: "$reviewer.image",
+                },
+              },
+            },
+          ],
+          as: "reviewList",
+        },
+      },
+      {
+        $addFields: {
+          rating: { $avg: "$reviewList.stars" },
+          reviews: { $size: "$reviewList" },
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          phone: 1,
+          address: 1,
+          gender: 1,
+          nationalId: 1,
+          image: 1,
+          tripCount: { $size: "$trips" },
+          orderCount: { $size: "$orders" },
+          rating: { $ifNull: ["$rating", 0] },
+          reviews: { $ifNull: ["$reviews", 0] },
+          reviewList: 1,
+        },
+      },
+    ]);
+
+    if (!userData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    res.status(200).json({ success: true, data: userData });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "فشل تحميل البيانات",
       error: error.message,
     });
   }

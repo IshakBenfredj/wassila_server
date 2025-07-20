@@ -16,7 +16,6 @@ const cancelledTripSchema = new mongoose.Schema(
       type: String,
       required: true,
       default: "غير محدد",
-      trim: true,
     },
   },
   { timestamps: true }

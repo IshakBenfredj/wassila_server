@@ -29,14 +29,20 @@ exports.createOrder = async (req, res) => {
     });
 
     // ✅ Validation
-    if (!professions || !Array.isArray(professions) || professions.length === 0) {
+    if (
+      !professions ||
+      !Array.isArray(professions) ||
+      professions.length === 0
+    ) {
       console.warn("❌ Missing professions");
       return res.status(400).json({ message: "يرجى تحديد المهن المطلوبة" });
     }
 
     if (!wilaya || !address || !description) {
       console.warn("❌ Missing required fields");
-      return res.status(400).json({ message: "الرجاء ملء جميع الحقول المطلوبة" });
+      return res
+        .status(400)
+        .json({ message: "الرجاء ملء جميع الحقول المطلوبة" });
     }
 
     // ✅ Upload images
@@ -80,7 +86,6 @@ exports.createOrder = async (req, res) => {
     });
   }
 };
-
 
 exports.getOrderById = async (req, res) => {
   try {
@@ -422,6 +427,54 @@ exports.deleteOrder = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء حذف الطلب",
+      error: error.message,
+    });
+  }
+};
+
+exports.completeOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ message: "الطلب غير موجود" });
+    }
+
+    if (!order.artisan) {
+      return res.status(400).json({ message: "لا يمكن إكمال الطلب بدون حرفي" });
+    }
+
+    if (order.status !== "accepted") {
+      return res
+        .status(400)
+        .json({ message: "فقط الطلبات النشطة يمكن إكمالها" });
+    }
+
+    const isClient = order.client.toString() === userId.toString();
+    const isArtisan = order.artisan.toString() === userId.toString();
+
+    if (!isClient && !isArtisan) {
+      return res
+        .status(403)
+        .json({ message: "ليس لديك صلاحية لإكمال هذا الطلب" });
+    }
+
+    order.status = "completed";
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "تم إكمال الطلب بنجاح",
+      data: order,
+    });
+  } catch (error) {
+    console.error("خطأ أثناء إكمال الطلب:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء إكمال الطلب",
       error: error.message,
     });
   }

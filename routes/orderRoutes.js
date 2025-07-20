@@ -9,6 +9,7 @@ const {
   rejectOrder,
   cancelOrder,
   acceptOffer,
+  completeOrder,
 } = require("../controllers/orderController");
 const { protect } = require("../middlewares/authMiddleware");
 
@@ -20,5 +21,7 @@ router.delete("/:id", protect, deleteOrder);
 router.put("/:id/reject", protect, rejectOrder);
 router.put("/:id/cancel", protect, cancelOrder);
 router.put("/:id/accept", protect, acceptOffer);
+router.put("/:id/complete", protect, completeOrder);
+
 
 module.exports = router;
