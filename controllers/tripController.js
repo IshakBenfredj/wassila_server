@@ -7,7 +7,6 @@ const CancelledTrip = require("../models/CancelledTrip");
 // @access  Private
 exports.createTrip = async (req, res) => {
   try {
-    const io = req.app.get("io");
     const trip = new Trip({
       client: req.user._id,
       ...req.body,

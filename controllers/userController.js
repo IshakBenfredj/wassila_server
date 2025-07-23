@@ -118,7 +118,7 @@ exports.deleteAccount = async (req, res) => {
 // @desc    Get full user profile data
 // @route   GET /api/users/profile
 // @access  Private
-exports.getUserProfileData = async (req, res) => {
+exports.getClientProfileData = async (req, res) => {
   try {
     const userId = req.params.userId || req.user._id;
     const objectId = new mongoose.Types.ObjectId(userId);
@@ -161,7 +161,7 @@ exports.getUserProfileData = async (req, res) => {
             {
               $project: {
                 stars: 1,
-                comment: 1,
+                reviewText: 1,
                 createdAt: 1,
                 reviewer: {
                   name: "$reviewer.name",
@@ -206,6 +206,232 @@ exports.getUserProfileData = async (req, res) => {
     res.status(200).json({ success: true, data: userData });
   } catch (error) {
     console.error("Error fetching user profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "فشل تحميل البيانات",
+      error: error.message,
+    });
+  }
+};
+
+exports.getDriverProfileData = async (req, res) => {
+  try {
+    const userId = req.params.userId || req.user._id;
+    const objectId = new mongoose.Types.ObjectId(userId);
+
+    const [userData] = await User.aggregate([
+      { $match: { _id: objectId } },
+      {
+        $lookup: {
+          from: "drivers",
+          localField: "_id",
+          foreignField: "user",
+          as: "driver",
+        },
+      },
+      { $unwind: "$driver" }, // We expect exactly one driver per user
+      {
+        $lookup: {
+          from: "trips",
+          localField: "driver._id",
+          foreignField: "driver",
+          as: "trips",
+        },
+      },
+      // Calculate total passengers (sum of placesNumber for all trips)
+      {
+        $lookup: {
+          from: "trips",
+          let: { driverId: "$driver._id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$driver", "$$driverId"] } } },
+            { 
+              $group: { 
+                _id: null, 
+                totalPassengers: { $sum: "$placesNumber" } 
+              } 
+            }
+          ],
+          as: "passengerSum",
+        },
+      },
+      {
+        $lookup: {
+          from: "reviews",
+          let: { userId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$reviewedUser", "$$userId"] } } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "reviewer",
+                foreignField: "_id",
+                as: "reviewer",
+              },
+            },
+            {
+              $unwind: "$reviewer",
+            },
+            {
+              $project: {
+                stars: 1,
+                reviewText: 1,
+                createdAt: 1,
+                reviewer: {
+                  name: "$reviewer.name",
+                  image: "$reviewer.image",
+                },
+              },
+            },
+          ],
+          as: "reviewList",
+        },
+      },
+      {
+        $addFields: {
+          rating: { $avg: "$reviewList.stars" },
+          reviews: { $size: "$reviewList" },
+          tripCount: { $size: "$trips" },
+          passengerCount: {
+            $ifNull: [{ $arrayElemAt: ["$passengerSum.totalPassengers", 0] }, 0],
+          },
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          phone: 1,
+          address: 1,
+          gender: 1,
+          nationalId: 1,
+          image: 1,
+          driver: {
+            vehicleName: "$driver.vehicleName",
+            vehicleType: "$driver.vehicleType",
+            placesNumber: "$driver.placesNumber",
+            transportTypes: "$driver.transportType",
+          },
+          tripCount: 1,
+          passengerCount: 1,
+          rating: { $ifNull: ["$rating", 0] },
+          reviews: { $ifNull: ["$reviews", 0] },
+          reviewList: 1,
+        },
+      },
+    ]);
+
+    if (!userData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    res.status(200).json({ success: true, data: userData });
+  } catch (error) {
+    console.error("Error fetching driver profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "فشل تحميل البيانات",
+      error: error.message,
+    });
+  }
+};
+
+exports.getArtisanProfileData = async (req, res) => {
+  try {
+    const userId = req.params.userId || req.user._id;
+    const objectId = new mongoose.Types.ObjectId(userId);
+
+    const [userData] = await User.aggregate([
+      { $match: { _id: objectId } },
+      {
+        $lookup: {
+          from: "artisans",
+          localField: "_id",
+          foreignField: "user",
+          as: "artisan",
+        },
+      },
+      { $unwind: { path: "$artisan", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "orders",
+          localField: "_id",
+          foreignField: "artisan",
+          as: "orders",
+        },
+      },
+      {
+        $lookup: {
+          from: "reviews",
+          let: { userId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$reviewedUser", "$$userId"] } } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "reviewer",
+                foreignField: "_id",
+                as: "reviewer",
+              },
+            },
+            {
+              $unwind: "$reviewer",
+            },
+            {
+              $project: {
+                stars: 1,
+                reviewText: 1,
+                createdAt: 1,
+                reviewer: {
+                  name: "$reviewer.name",
+                  image: "$reviewer.image",
+                },
+              },
+            },
+          ],
+          as: "reviewList",
+        },
+      },
+      {
+        $addFields: {
+          rating: { $avg: "$reviewList.stars" },
+          reviews: { $size: "$reviewList" },
+          orderCount: { $size: "$orders" },
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          phone: 1,
+          address: 1,
+          gender: 1,
+          nationalId: 1,
+          image: 1,
+          artisan: {
+            professions: 1,
+            wilayat: 1,
+            startYear: 1,
+          },
+          orderCount: 1,
+          rating: { $ifNull: ["$rating", 0] },
+          reviews: { $ifNull: ["$reviews", 0] },
+          reviewList: 1,
+        },
+      },
+    ]);
+
+    if (!userData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    res.status(200).json({ success: true, data: userData });
+  } catch (error) {
+    console.error("Error fetching artisan profile:", error);
     res.status(500).json({
       success: false,
       message: "فشل تحميل البيانات",
