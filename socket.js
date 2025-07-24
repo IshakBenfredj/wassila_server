@@ -117,7 +117,7 @@ function setupSocket(server) {
       const tripIndex = trips.findIndex((t) => t._id === data._id);
       if (tripIndex !== -1) {
         trips[tripIndex] = { ...trips[tripIndex], ...data };
-
+        console.log("trips[tripIndex]", trips[tripIndex]);
         io.emit("updateTrip", trips[tripIndex]);
       }
     });
@@ -172,7 +172,6 @@ function setupSocket(server) {
       );
     });
   });
-
 }
 
 module.exports = {

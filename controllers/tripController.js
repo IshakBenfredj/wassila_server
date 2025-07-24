@@ -200,30 +200,15 @@ exports.changeStatus = async (req, res) => {
       update.driver = driver;
     }
 
-    let trip;
-    if (update.driver) {
-      trip = await Trip.findByIdAndUpdate(tripId, update, {
-        new: true,
-        runValidators: true,
-      })
-        .populate("client")
-        .populate({
-          path: "driver",
-          populate: { path: "user" },
-        });
-    } else {
-      trip = await Trip.findByIdAndUpdate(tripId, update, {
-        new: true,
-        runValidators: true,
-      }).populate("client");
-    }
-
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: "الرحلة غير موجودة",
+    const trip = await Trip.findByIdAndUpdate(tripId, update, {
+      new: true,
+      runValidators: true,
+    })
+      .populate("client")
+      .populate({
+        path: "driver",
+        populate: { path: "user" },
       });
-    }
 
     // Customize success message based on status
     let successMessage = "تم تحديث حالة الرحلة بنجاح";
