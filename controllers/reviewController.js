@@ -6,8 +6,16 @@ const User = require("../models/User");
 // @access  Private
 exports.createReview = async (req, res) => {
   try {
-    const { stars, reviewText, reviewedUser } = req.body;
+    const { stars, reviewText, reviewedUser, trip } = req.body;
 
+    if (!stars || !reviewedUser || !trip) {
+      return res.status(400).json({
+        success: false,
+        message: "جميع الحقول مطلوبة",
+      });
+    }
+
+    // لا يمكن تقييم نفسك
     if (req.user._id.equals(reviewedUser)) {
       return res.status(400).json({
         success: false,
@@ -15,29 +23,34 @@ exports.createReview = async (req, res) => {
       });
     }
 
+    // تحقق مما إذا تم التقييم مسبقًا لهذا المستخدم ونفس الرحلة
     const existingReview = await Review.findOne({
       reviewer: req.user._id,
       reviewedUser,
+      trip,
     });
 
     if (existingReview) {
       return res.status(400).json({
         success: false,
-        message: "لقد قمت بتقييم هذا المستخدم من قبل",
+        message: "لقد قمت بتقييم هذا المستخدم لهذه الرحلة من قبل",
       });
     }
 
+    // إنشاء التقييم
     const review = new Review({
       stars,
       reviewText,
       reviewer: req.user._id,
       reviewedUser,
+      trip,
     });
 
     await review.save();
 
     await review.populate("reviewer");
     await review.populate("reviewedUser");
+    await review.populate("trip"); // optional if you want trip details
 
     res.status(201).json({
       success: true,
@@ -46,13 +59,14 @@ exports.createReview = async (req, res) => {
     });
   } catch (err) {
     console.error("خطأ في إنشاء التقييم:", err);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء إنشاء التقييم",
       error: err.message,
     });
   }
 };
+
 
 // @desc    الحصول على جميع التقييمات لمستخدم معين
 // @route   GET /api/reviews/user/:userId
