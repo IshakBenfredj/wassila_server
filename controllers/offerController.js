@@ -25,7 +25,7 @@ exports.createOffer = async (req, res) => {
     });
 
     await offer.populate("artisan");
-
+    await offer.populate("order");
     res.status(201).json({
       success: true,
       message: "تم إرسال العرض بنجاح",

@@ -5,7 +5,6 @@ const Artisan = require("../models/Artisan");
 const Offer = require("../models/Offer");
 
 exports.createOrder = async (req, res) => {
-  console.log("🚀 Creating new order...");
 
   try {
     const {
@@ -17,16 +16,6 @@ exports.createOrder = async (req, res) => {
       maxPrice,
       images,
     } = req.body;
-
-    console.log("📦 Request Body:", {
-      artisan,
-      professions,
-      wilaya,
-      address,
-      description,
-      maxPrice,
-      imageCount: images?.length || 0,
-    });
 
     // ✅ Validation
     if (
@@ -251,7 +240,7 @@ exports.acceptOffer = async (req, res) => {
     const { artisan } = req.body;
     const userId = req.user._id;
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('client').populate('artisan');
 
     if (!order) {
       return res.status(404).json({ message: "الطلب غير موجود" });
@@ -305,7 +294,7 @@ exports.rejectOrder = async (req, res) => {
       return res.status(400).json({ message: "يرجى تقديم سبب الرفض" });
     }
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('client').populate('artisan');
 
     if (
       !order ||
@@ -356,7 +345,7 @@ exports.cancelOrder = async (req, res) => {
       return res.status(400).json({ message: "يرجى تقديم سبب الإلغاء" });
     }
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('client').populate('artisan');
 
     if (!order) {
       return res.status(404).json({ message: "الطلب غير موجود" });
@@ -437,7 +426,7 @@ exports.completeOrder = async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('client').populate('artisan');
 
     if (!order) {
       return res.status(404).json({ message: "الطلب غير موجود" });
@@ -453,8 +442,8 @@ exports.completeOrder = async (req, res) => {
         .json({ message: "فقط الطلبات النشطة يمكن إكمالها" });
     }
 
-    const isClient = order.client.toString() === userId.toString();
-    const isArtisan = order.artisan.toString() === userId.toString();
+    const isClient = order.client._id.toString() === userId.toString();
+    const isArtisan = order.artisan._id.toString() === userId.toString();
 
     if (!isClient && !isArtisan) {
       return res

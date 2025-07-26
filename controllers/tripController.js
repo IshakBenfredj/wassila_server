@@ -189,10 +189,6 @@ exports.changeStatus = async (req, res) => {
         cancelledBy: req.user._id,
         reason: reason || "تم الإلغاء بعد بدء الرحلة",
       });
-      // update.driver = null;
-      // if (currentTrip.status !== "in_trip") {
-      //   // update.status = "pending";
-      // }
       await cancelledTrip.save();
     }
 
@@ -210,7 +206,6 @@ exports.changeStatus = async (req, res) => {
         populate: { path: "user" },
       });
 
-    // Customize success message based on status
     let successMessage = "تم تحديث حالة الرحلة بنجاح";
     if (status === "completed") {
       successMessage = "تم إكمال الرحلة بنجاح";

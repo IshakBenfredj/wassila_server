@@ -150,6 +150,7 @@ function setupSocket(server) {
         title: notification.title,
         body: notification.body,
         type: notification.type,
+        redirectId: notification.redirectId,
         isRead: false,
         createdAt: notification.createdAt || new Date().toISOString(),
       };
@@ -158,6 +159,31 @@ function setupSocket(server) {
       io.emit("newNotification", newNotif);
 
       console.log("📢 Notification emitted (not saved):", newNotif);
+    });
+
+    socket.on("markNotificationRead", (notifId) => {
+      const notifIndex = notifications.findIndex((n) => n._id === notifId);
+      if (notifIndex !== -1) {
+        notifications[notifIndex].isRead = true;
+        io.emit("notificationUpdated", notifications[notifIndex]); 
+        console.log(`✅ Notification ${notifId} marked as read`);
+      }
+    });
+
+    socket.on("markUserNotificationsRead", (userId) => {
+      const updated = notifications.filter(
+        (n) => n.user === userId && !n.isRead
+      );
+
+      if (updated.length > 0) {
+        updated.forEach((n) => (n.isRead = true));
+        io.emit("userNotificationsUpdated", { userId, notifications: updated });
+        console.log(
+          `✅ ${updated.length} notifications marked as read for user ${userId}`
+        );
+      } else {
+        console.log(`ℹ️ No unread notifications for user ${userId}`);
+      }
     });
 
     // Disconnect

@@ -5,11 +5,15 @@ const notificationTypes = [
   "trip_accepted",
   "trip_status_changed",
   "artisan_order_requested",
-  "artisan_order_accepted",
-  "driver_rated_client",
-  "client_rated_driver",
-  "artisan_rated_client",
-  "client_rated_artisan",
+  "artisan_add_offer",
+  "accept_offer",
+  "artisan_order_reject",
+  "artisan_order_cancel",
+  "end_order",
+  "client_order_cancel",
+  "driver_rated",
+  "client_rated",
+  "artisan_rated",
 ];
 
 const notificationSchema = new mongoose.Schema(
@@ -17,7 +21,7 @@ const notificationSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true, 
+      required: true,
     },
     fromUser: {
       type: mongoose.Schema.Types.ObjectId,
@@ -28,6 +32,9 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: notificationTypes,
+    },
+    redirectId: {
+      type: String,
     },
     isRead: {
       type: Boolean,

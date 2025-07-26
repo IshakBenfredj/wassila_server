@@ -6,6 +6,8 @@ const { protect } = require('../middlewares/authMiddleware');
 router.post('/', protect, reviewController.createReview);
 router.get('/user/:userId', reviewController.getUserReviews);
 router.get('/user/:userId/average', reviewController.getUserAverageRating);
+router.get("/trip/:tripId", protect, reviewController.getReviewByTrip);
+router.get("/order/:orderId", protect, reviewController.getReviewsByOrder);
 router.put('/:reviewId', protect, reviewController.updateReview);
 router.delete('/:reviewId', protect, reviewController.deleteReview);
 

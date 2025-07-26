@@ -6,9 +6,9 @@ const User = require("../models/User");
 // @access  Private
 exports.createReview = async (req, res) => {
   try {
-    const { stars, reviewText, reviewedUser, trip } = req.body;
+    const { stars, reviewText, reviewedUser, trip, order } = req.body;
 
-    if (!stars || !reviewedUser || !trip) {
+    if (!stars || !reviewedUser || (!trip && !order)) {
       return res.status(400).json({
         success: false,
         message: "جميع الحقول مطلوبة",
@@ -28,6 +28,7 @@ exports.createReview = async (req, res) => {
       reviewer: req.user._id,
       reviewedUser,
       trip,
+      order
     });
 
     if (existingReview) {
@@ -44,13 +45,14 @@ exports.createReview = async (req, res) => {
       reviewer: req.user._id,
       reviewedUser,
       trip,
+      order
     });
 
     await review.save();
 
     await review.populate("reviewer");
     await review.populate("reviewedUser");
-    await review.populate("trip"); // optional if you want trip details
+    await review.populate("trip");
 
     res.status(201).json({
       success: true,
@@ -66,7 +68,6 @@ exports.createReview = async (req, res) => {
     });
   }
 };
-
 
 // @desc    الحصول على جميع التقييمات لمستخدم معين
 // @route   GET /api/reviews/user/:userId
@@ -103,15 +104,15 @@ exports.getUserAverageRating = async (req, res) => {
 
     const result = await Review.aggregate([
       {
-        $match: { reviewedUser: mongoose.Types.ObjectId(userId) }
+        $match: { reviewedUser: mongoose.Types.ObjectId(userId) },
       },
       {
         $group: {
           _id: null,
           averageRating: { $avg: "$stars" },
-          totalReviews: { $sum: 1 }
-        }
-      }
+          totalReviews: { $sum: 1 },
+        },
+      },
     ]);
 
     const averageRating = result[0]?.averageRating || 0;
@@ -121,8 +122,8 @@ exports.getUserAverageRating = async (req, res) => {
       success: true,
       data: {
         averageRating: parseFloat(averageRating.toFixed(1)),
-        totalReviews
-      }
+        totalReviews,
+      },
     });
   } catch (err) {
     console.error("خطأ في حساب متوسط التقييم:", err);
@@ -201,6 +202,68 @@ exports.deleteReview = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "حدث خطأ أثناء حذف التقييم",
+      error: err.message,
+    });
+  }
+};
+
+// @desc    الحصول على التقييم بناءً على الرحلة والمستخدم الحالي
+// @route   GET /api/reviews/trip/:tripId
+// @access  Private
+exports.getReviewByTrip = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const reviewedUserId = req.user._id;
+
+    const review = await Review.findOne({
+      trip: tripId,
+      reviewedUser: reviewedUserId,
+    })
+      .populate("reviewedUser")
+      .populate("reviewer");
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: review,
+    });
+  } catch (err) {
+    console.error("خطأ في جلب التقييم:", err);
+    res.status(400).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب التقييم",
+      error: err.message,
+    });
+  }
+};
+
+// @desc    الحصول على جميع التقييمات لطلب معين (Order)
+// @route   GET /api/reviews/order/:orderId
+// @access  Public
+exports.getReviewsByOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const reviews = await Review.find({ order: orderId })
+      .populate("reviewer")
+      .populate("reviewedUser")
+      .populate("order");
+
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      data: reviews,
+    });
+  } catch (err) {
+    console.error("خطأ في جلب التقييمات للطلب:", err);
+    res.status(400).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب التقييمات الخاصة بالطلب",
       error: err.message,
     });
   }
