@@ -39,10 +39,15 @@ const reviewSchema = new Schema(
   { timestamps: true }
 );
 
-// Index to prevent duplicate reviews from the same user
-reviewSchema.index({ reviewer: 1, reviewedUser: 1, trip :1 }, { unique: true });
+reviewSchema.index(
+  { reviewer: 1, reviewedUser: 1, trip: 1 },
+  { unique: true, partialFilterExpression: { trip: { $exists: true } } }
+);
+reviewSchema.index(
+  { reviewer: 1, reviewedUser: 1, order: 1 },
+  { unique: true, partialFilterExpression: { order: { $exists: true } } }
+);
 
-// Optional: Add validation to prevent users from reviewing themselves
 reviewSchema.pre("validate", function (next) {
   if (this.reviewer.equals(this.reviewedUser)) {
     this.invalidate("reviewer", "لا يمكنك تقييم نفسك");

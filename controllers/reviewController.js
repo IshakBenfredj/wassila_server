@@ -28,7 +28,7 @@ exports.createReview = async (req, res) => {
       reviewer: req.user._id,
       reviewedUser,
       trip,
-      order
+      order,
     });
 
     if (existingReview) {
@@ -45,7 +45,7 @@ exports.createReview = async (req, res) => {
       reviewer: req.user._id,
       reviewedUser,
       trip,
-      order
+      order,
     });
 
     await review.save();
@@ -53,6 +53,7 @@ exports.createReview = async (req, res) => {
     await review.populate("reviewer");
     await review.populate("reviewedUser");
     await review.populate("trip");
+    await review.populate("order");
 
     res.status(201).json({
       success: true,

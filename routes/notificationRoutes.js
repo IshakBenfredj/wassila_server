@@ -10,11 +10,6 @@ router.post("/", protect, async (req, res) => {
     const { userId, type, body, redirectId } = req.body;
     const fromUser = req.user;
 
-    console.log("userId", userId);
-    console.log("type", type);
-    console.log("body", body);
-    console.log("redirectId", redirectId);
-
     let title = "";
 
     switch (type) {

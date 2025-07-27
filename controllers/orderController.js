@@ -246,7 +246,7 @@ exports.acceptOffer = async (req, res) => {
       return res.status(404).json({ message: "الطلب غير موجود" });
     }
 
-    if (order.client.toString() !== userId.toString()) {
+    if (order.client._id.toString() !== userId.toString()) {
       return res.status(403).json({ message: "لا يمكنك تعديل هذا الطلب" });
     }
 
@@ -268,6 +268,8 @@ exports.acceptOffer = async (req, res) => {
     }
 
     await order.save();
+
+    await order.populate('artisan')
 
     res.status(200).json({
       success: true,
@@ -299,7 +301,7 @@ exports.rejectOrder = async (req, res) => {
     if (
       !order ||
       !order.artisan ||
-      order.artisan.toString() !== artisanId.toString()
+      order.artisan._id.toString() !== artisanId.toString()
     ) {
       return res.status(403).json({ message: "لا يمكنك رفض هذا الطلب" });
     }
@@ -351,9 +353,9 @@ exports.cancelOrder = async (req, res) => {
       return res.status(404).json({ message: "الطلب غير موجود" });
     }
 
-    const isClient = order.client.toString() === userId.toString();
+    const isClient = order.client._id.toString() === userId.toString();
     const isArtisan =
-      order.artisan && order.artisan.toString() === userId.toString();
+      order.artisan && order.artisan._id.toString() === userId.toString();
 
     if (!isClient && !isArtisan) {
       return res
