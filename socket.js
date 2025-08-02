@@ -165,7 +165,7 @@ function setupSocket(server) {
       const notifIndex = notifications.findIndex((n) => n._id === notifId);
       if (notifIndex !== -1) {
         notifications[notifIndex].isRead = true;
-        io.emit("notificationUpdated", notifications[notifIndex]); 
+        io.emit("notificationUpdated", notifications[notifIndex]);
         console.log(`✅ Notification ${notifId} marked as read`);
       }
     });
@@ -184,6 +184,106 @@ function setupSocket(server) {
       } else {
         console.log(`ℹ️ No unread notifications for user ${userId}`);
       }
+    });
+
+    /* =============== ✅ SEND MESSAGE =============== */
+    socket.on("sendMessage", async (data, callback) => {
+      try {
+        const { chatId, senderId, receiverId, text } = data;
+
+        // 1️⃣ Create or get chat
+        let chat = chatId
+          ? await Chat.findById(chatId)
+          : await Chat.findOne({ members: { $all: [senderId, receiverId] } });
+
+        if (!chat) {
+          chat = await Chat.create({ members: [senderId, receiverId] });
+        }
+
+        // 2️⃣ Create message
+        const message = await Message.create({
+          chatId: chat._id,
+          senderId,
+          receiverId,
+          text,
+          read: false,
+        });
+
+        // 3️⃣ Update last message in chat
+        await Chat.findByIdAndUpdate(chat._id, {
+          lastMessage: {
+            text,
+            senderId,
+            createdAt: message.createdAt,
+            read: false,
+          },
+        });
+
+        // 4️⃣ Emit to sender and receiver
+        const receiver = connectedClients.find((c) => c._id === receiverId);
+        const sender = connectedClients.find((c) => c._id === senderId);
+
+        if (receiver) {
+          io.to(receiver.socketId).emit("newMessage", message);
+        }
+        if (sender) {
+          io.to(sender.socketId).emit("newMessage", message);
+        }
+
+        console.log(
+          `💬 Message sent from ${senderId} to ${receiverId}: ${text}`
+        );
+
+        if (typeof callback === "function") {
+          callback({
+            success: true,
+            data: message,
+            message: "تم إرسال الرسالة",
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        if (typeof callback === "function") {
+          callback({ success: false, message: "خطأ أثناء إرسال الرسالة" });
+        }
+      }
+    });
+
+    /* =============== ✅ DELETE MESSAGE =============== */
+    socket.on("deleteMessage", async ({ messageId, userId }, callback) => {
+      try {
+        const msg = await Message.findById(messageId);
+        if (!msg)
+          return callback({ success: false, message: "الرسالة غير موجودة" });
+
+        if (msg.senderId.toString() !== userId) {
+          return callback({
+            success: false,
+            message: "غير مسموح بحذف الرسالة",
+          });
+        }
+
+        await Message.findByIdAndDelete(messageId);
+
+        io.emit("messageDeleted", { messageId, chatId: msg.chatId });
+
+        callback({ success: true, message: "تم حذف الرسالة" });
+        console.log(`🗑️ Message deleted by ${userId}`);
+      } catch (err) {
+        callback({ success: false, message: "خطأ أثناء حذف الرسالة" });
+      }
+    });
+
+    /* =============== ✅ MARK MESSAGES READ =============== */
+    socket.on("markRead", async ({ chatId, userId }) => {
+      await Message.updateMany(
+        { chatId, receiverId: userId, read: false },
+        { $set: { read: true } }
+      );
+      await Chat.findByIdAndUpdate(chatId, { "lastMessage.read": true });
+
+      io.emit("messagesRead", { chatId, userId });
+      console.log(`👁️ Messages marked as read in chat ${chatId}`);
     });
 
     // Disconnect
