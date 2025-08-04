@@ -1,8 +1,11 @@
 const { Server } = require("socket.io");
+const Chat = require("./models/Chat");
+const Message = require("./models/Message");
 
 let availableDrivers = [];
 let trips = [];
 let connectedClients = [];
+let connectedUsers = [];
 let notifications = [];
 
 function setupSocket(server) {
@@ -15,6 +18,24 @@ function setupSocket(server) {
 
   io.on("connection", (socket) => {
     console.log(`🚗 Socket connected: ${socket.id}`);
+
+    socket.on("userConnected", (data) => {
+      const { _id, name, image, role } = data;
+
+      // أزل المستخدم لو موجود مسبقًا
+      connectedUsers = connectedUsers.filter((u) => u._id !== _id);
+
+      connectedUsers.push({
+        _id,
+        name,
+        image,
+        role, // "client", "driver", "admin"...
+        socketId: socket.id,
+        connectedAt: new Date().toISOString(),
+      });
+
+      console.log(`✅ ${role} connected: ${name} (${_id})`);
+    });
 
     // Driver
     socket.on("driverAvailable", (data) => {
@@ -187,65 +208,22 @@ function setupSocket(server) {
     });
 
     /* =============== ✅ SEND MESSAGE =============== */
-    socket.on("sendMessage", async (data, callback) => {
-      try {
-        const { chatId, senderId, receiverId, text } = data;
+    socket.on("sendMessage", async (messageData) => {
+      const { receiverId, senderId } = messageData;
 
-        // 1️⃣ Create or get chat
-        let chat = chatId
-          ? await Chat.findById(chatId)
-          : await Chat.findOne({ members: { $all: [senderId, receiverId] } });
+      const receiver = connectedClients.find((c) => c._id === receiverId);
+      const sender = connectedClients.find((c) => c._id === senderId);
 
-        if (!chat) {
-          chat = await Chat.create({ members: [senderId, receiverId] });
-        }
+      if (receiver) {
+        io.to(receiver.socketId).emit("newMessage", messageData);
+        io.to(receiver.socketId).emit("refreshChats");
+        console.log(`💬 Message sent to receiver: ${receiverId}`);
+      }
 
-        // 2️⃣ Create message
-        const message = await Message.create({
-          chatId: chat._id,
-          senderId,
-          receiverId,
-          text,
-          read: false,
-        });
-
-        // 3️⃣ Update last message in chat
-        await Chat.findByIdAndUpdate(chat._id, {
-          lastMessage: {
-            text,
-            senderId,
-            createdAt: message.createdAt,
-            read: false,
-          },
-        });
-
-        // 4️⃣ Emit to sender and receiver
-        const receiver = connectedClients.find((c) => c._id === receiverId);
-        const sender = connectedClients.find((c) => c._id === senderId);
-
-        if (receiver) {
-          io.to(receiver.socketId).emit("newMessage", message);
-        }
-        if (sender) {
-          io.to(sender.socketId).emit("newMessage", message);
-        }
-
-        console.log(
-          `💬 Message sent from ${senderId} to ${receiverId}: ${text}`
-        );
-
-        if (typeof callback === "function") {
-          callback({
-            success: true,
-            data: message,
-            message: "تم إرسال الرسالة",
-          });
-        }
-      } catch (err) {
-        console.error(err);
-        if (typeof callback === "function") {
-          callback({ success: false, message: "خطأ أثناء إرسال الرسالة" });
-        }
+      if (sender && sender.socketId !== receiver?.socketId) {
+        io.to(sender.socketId).emit("newMessage", messageData);
+        io.to(sender.socketId).emit("refreshChats");
+        console.log(`💬 Message echoed to sender: ${senderId}`);
       }
     });
 
@@ -253,8 +231,9 @@ function setupSocket(server) {
     socket.on("deleteMessage", async ({ messageId, userId }, callback) => {
       try {
         const msg = await Message.findById(messageId);
-        if (!msg)
+        if (!msg) {
           return callback({ success: false, message: "الرسالة غير موجودة" });
+        }
 
         if (msg.senderId.toString() !== userId) {
           return callback({
@@ -265,10 +244,22 @@ function setupSocket(server) {
 
         await Message.findByIdAndDelete(messageId);
 
-        io.emit("messageDeleted", { messageId, chatId: msg.chatId });
+        // Notify only relevant users (sender + receiver)
+        const chat = await Chat.findById(msg.chatId);
+        const chatParticipants = [chat.user1.toString(), chat.user2.toString()];
+
+        connectedClients.forEach((client) => {
+          if (chatParticipants.includes(client._id)) {
+            io.to(client.socketId).emit("messageDeleted", {
+              messageId,
+              chatId: msg.chatId,
+            });
+            io.to(client.socketId).emit("refreshChats");
+          }
+        });
 
         callback({ success: true, message: "تم حذف الرسالة" });
-        console.log(`🗑️ Message deleted by ${userId}`);
+        console.log(`🗑️ Message ${messageId} deleted by user ${userId}`);
       } catch (err) {
         callback({ success: false, message: "خطأ أثناء حذف الرسالة" });
       }
@@ -280,10 +271,21 @@ function setupSocket(server) {
         { chatId, receiverId: userId, read: false },
         { $set: { read: true } }
       );
-      await Chat.findByIdAndUpdate(chatId, { "lastMessage.read": true });
 
-      io.emit("messagesRead", { chatId, userId });
-      console.log(`👁️ Messages marked as read in chat ${chatId}`);
+      await Chat.findByIdAndUpdate(chatId, {
+        "lastMessage.read": true,
+      });
+
+      // Notify both sender and receiver
+      const chat = await Chat.findById(chatId);
+      const participants = [chat.user1.toString(), chat.user2.toString()];
+
+      connectedClients.forEach((client) => {
+        if (participants.includes(client._id)) {
+          io.to(client.socketId).emit("messagesRead", { chatId, userId });
+          io.to(client.socketId).emit("refreshChats");
+        }
+      });
     });
 
     // Disconnect

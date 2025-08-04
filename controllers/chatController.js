@@ -3,17 +3,31 @@ const Message = require("../models/Message");
 
 exports.getChats = async (req, res) => {
   try {
-    
-    const userId = req.user._id; 
+    const userId = req.user._id;
 
     const chats = await Chat.find({ members: userId })
       .sort({ updatedAt: -1 })
-      .populate("members") 
+      .populate("members")
       .lean();
+
+    const enrichedChats = await Promise.all(
+      chats.map(async (chat) => {
+        const unreadCount = await Message.countDocuments({
+          chatId: chat._id,
+          receiverId: userId,
+          read: false,
+        });
+
+        return {
+          ...chat,
+          unreadCount,
+        };
+      })
+    );
 
     res.json({
       success: true,
-      data: chats,
+      data: enrichedChats,
     });
   } catch (err) {
     res.status(500).json({
@@ -36,10 +50,11 @@ exports.createOrGetChat = async (req, res) => {
 
     let chat = await Chat.findOne({
       members: { $all: [senderId, receiverId] },
-    });
+    }).populate("members");
 
     if (!chat) {
       chat = await Chat.create({ members: [senderId, receiverId] });
+      chat = await Chat.findById(chat._id).populate("members");
     }
 
     res.json({
@@ -109,6 +124,7 @@ exports.getMessages = async (req, res) => {
 
     const messages = await Message.find({ chatId })
       .sort({ createdAt: -1 })
+      .populate("receiverId") // 👈 for showing receiver user details
       .lean();
 
     res.json({
@@ -116,7 +132,6 @@ exports.getMessages = async (req, res) => {
       data: messages,
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء جلب الرسائل",
@@ -124,10 +139,10 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-
 exports.deleteMessage = async (req, res) => {
   try {
-    const { messageId, userId } = req.body;
+    const { messageId } = req.params;
+    const userId = req.user._id;
 
     const message = await Message.findById(messageId);
 
