@@ -153,7 +153,7 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    if (message.senderId.toString() !== userId) {
+    if (message.senderId !== userId) {
       return res.status(403).json({
         success: false,
         message: "غير مسموح بحذف هذه الرسالة",
