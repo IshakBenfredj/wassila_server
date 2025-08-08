@@ -1,180 +1,203 @@
 const Chat = require("../models/Chat");
 const Message = require("../models/Message");
+const { emitSocketEvent } = require("../socket");
 
-exports.getChats = async (req, res) => {
+exports.createChat = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const chats = await Chat.find({ members: { $in: [userId] } })
-      .sort({ updatedAt: -1 })
-      .populate("members")
-      .populate("lastMessage.senderId");
+    const { userId } = req.body;
+    const currentUserId = req.user._id;
 
-    const enrichedChats = await Promise.all(
-      chats.map(async (chat) => {
-        const unreadCount = await Message.countDocuments({
-          chatId: chat._id,
-          receiverId: userId,
-          read: false,
-        });
+    // Check if chat already exists
+    const existingChat = await Chat.findOne({
+      members: { $all: [currentUserId, userId] },
+    })
+      .populate("members", "name image")
+      .populate({
+        path: "lastMessage",
+        populate: {
+          path: "senderId",
+          select: "name image",
+        },
+      });
 
-        return {
-          ...chat.toObject(),
-          unreadCount,
-        };
-      })
-    );
+    if (existingChat) {
+      return res.status(200).json({
+        success: true,
+        chat: existingChat,
+      });
+    }
 
-    res.json({
-      success: true,
-      data: enrichedChats,
+    const newChat = new Chat({
+      members: [currentUserId, userId],
     });
-  } catch (err) {
-    console.error("Error fetching chats:", err);
+
+    const savedChat = await newChat.save();
+
+    res.status(201).json({
+      success: true,
+      chat: savedChat,
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
-      message: "حدث خطأ أثناء جلب المحادثات",
+      message: error.message,
     });
   }
 };
 
-exports.createOrGetChat = async (req, res) => {
+exports.getUserChats = async (req, res) => {
   try {
-    const { senderId, receiverId } = req.body;
+    const userId = req.user._id;
+    const chats = await Chat.find({
+      members: { $in: [userId] },
+    })
+      .populate("members", "name image")
+      .populate({
+        path: "lastMessage",
+        populate: {
+          path: "senderId",
+          select: "name image",
+        },
+      })
+      .sort({ updatedAt: -1 });
 
-    if (!senderId || !receiverId) {
-      return res.status(400).json({
-        success: false,
-        message: "معرف المرسل أو المستقبل مفقود",
-      });
-    }
-
-    let chat = await Chat.findOne({
-      members: { $all: [senderId, receiverId] },
-    }).populate("members");
-
-    if (!chat) {
-      chat = await Chat.create({ members: [senderId, receiverId] });
-      chat = await Chat.findById(chat._id).populate("members");
-    }
-
-    res.json({
+    res.status(200).json({
       success: true,
-      data: chat,
-      message: "تم إنشاء/جلب المحادثة بنجاح",
+      chats,
     });
-  } catch (err) {
-    console.error("Error creating/getting chat:", err);
+  } catch (error) {
     res.status(500).json({
       success: false,
-      message: "حدث خطأ أثناء إنشاء/جلب المحادثة",
+      message: error.message,
+    });
+  }
+};
+
+exports.getChatMessages = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const messages = await Message.find({ chatId })
+      .populate("senderId", "name image")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      messages,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };
 
 exports.sendMessage = async (req, res) => {
-  console.log("sendMessage called with body:", req.body);
   try {
-    const { chatId, receiverId, text } = req.body;
+    const { chatId, text } = req.body;
     const senderId = req.user._id;
 
-    if (!senderId || !receiverId || !text) {
-      return res.status(400).json({
-        success: false,
-        message: "البيانات ناقصة لإرسال الرسالة",
+    const chat = await Chat.findById(chatId)
+      .populate("members", "name image")
+      .populate({
+        path: "lastMessage",
+        populate: {
+          path: "senderId",
+          select: "name image",
+        },
       });
-    }
-
-    let chat = chatId
-      ? await Chat.findById(chatId)
-      : await Chat.findOne({ members: { $all: [senderId, receiverId] } });
-
-    if (!chat) {
-      chat = await Chat.create({ members: [senderId, receiverId] });
-    }
-
-    const message = await Message.create({
-      chatId: chat._id,
-      senderId,
-      receiverId,
-      text,
-      read: false,
-    });
-
-    await Chat.findByIdAndUpdate(chat._id, {
-      lastMessage: {
-        text,
-        senderId,
-        createdAt: message.createdAt,
-        read: false,
-      },
-    });
-
-    res.json({
-      success: true,
-      data: message,
-    });
-  } catch (err) {
-    console.error("Error sending message:", err);
-    res.status(500).json({
-      success: false,
-      message: "حدث خطأ أثناء إرسال الرسالة",
-    });
-  }
-};
-
-exports.getMessages = async (req, res) => {
-  try {
-    const { chatId } = req.params;
-
-    const messages = await Message.find({ chatId })
-      .sort({ createdAt: 1 })
-      .populate("receiverId");
-
-    res.json({
-      success: true,
-      data: messages,
-    });
-  } catch (err) {
-    console.error("Error fetching messages:", err);
-    res.status(500).json({
-      success: false,
-      message: "حدث خطأ أثناء جلب الرسائل",
-    });
-  }
-};
-
-exports.deleteMessage = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const userId = req.user._id;
-
-    const message = await Message.findById(messageId);
-
-    if (!message) {
+    if (!chat || !chat.members.some((member) => member._id.equals(senderId))) {
       return res.status(404).json({
         success: false,
-        message: "الرسالة غير موجودة",
+        message: "Chat not found or unauthorized access",
       });
     }
 
-    if (message.senderId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "غير مسموح بحذف هذه الرسالة",
-      });
-    }
+    const receiver = chat.members.find(
+      (member) => !member._id.equals(senderId)
+    );
 
-    await Message.findByIdAndDelete(messageId);
-
-    res.json({
-      success: true,
-      message: "تم حذف الرسالة بنجاح",
+    const newMessage = new Message({
+      chatId,
+      senderId,
+      text,
+      receiverId: receiver._id,
     });
-  } catch (err) {
-    console.error("Error deleting message:", err);
+
+    const savedMessage = await newMessage.save();
+
+    chat.lastMessage = {
+      read: false,
+      senderId,
+      text,
+      createdAt: new Date(),
+    };
+    await chat.save();
+    await chat.populate("lastMessage.senderId", "name image");
+
+    const populatedMessage = await Message.populate(savedMessage, {
+      path: "senderId",
+      select: "name image",
+    });
+
+    emitSocketEvent(receiver._id.toString(), "newMessage", {
+      message :populatedMessage,
+      chat
+    });
+
+    emitSocketEvent(senderId.toString(), "messageSent", {
+      ...populatedMessage,
+      chatId: chat._id.toString(),
+    });
+
+    // const populatedMessage = await Message.populate(savedMessage, {
+    //   path: "senderId",
+    //   select: "name image",
+    // });
+
+    // emitSocketEvent(receiver._id.toString(), "newMessage", {
+    //   ...populatedMessage,
+    //   chatId: chat._id.toString(),
+    //   unreadCount: 1,
+    // });
+
+    // emitSocketEvent(senderId.toString(), "messageSent", {
+    //   ...responseData,
+    //   chatId: chat._id.toString(),
+    // });
+
+    res.status(201).json({
+      success: true,
+      message: populatedMessage,
+      chat,
+    });
+  } catch (error) {
+    console.error("Error sending message:", error);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ أثناء حذف الرسالة",
+      message: "Internal server error",
+    });
+  }
+};
+
+exports.markMessagesAsRead = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user._id;
+
+    await Message.updateMany(
+      { chatId, senderId: { $ne: userId }, read: false },
+      { $set: { read: true } }
+    );
+
+    res.status(200).json({
+      success: true,
+      // message: "Messages marked as read",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

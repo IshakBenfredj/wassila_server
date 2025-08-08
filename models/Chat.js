@@ -1,16 +1,30 @@
-const mongoose = require("mongoose");
+// models/Chat.js
+const mongoose = require('mongoose');
 
-const chatSchema = new mongoose.Schema(
-  {
-    members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    lastMessage: {
-      text: String,
-      senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      createdAt: Date,
-      read: { type: Boolean, default: false },
-    },
+const chatSchema = new mongoose.Schema({
+  participants: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }],
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
   },
-  { timestamps: true }
-);
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model("Chat", chatSchema);
+// Index for better performance
+chatSchema.index({ participants: 1 });
+chatSchema.index({ updatedAt: -1 });
+
+module.exports = mongoose.model('Chat', chatSchema);

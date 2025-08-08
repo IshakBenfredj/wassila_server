@@ -65,6 +65,9 @@ mongoose
     process.exit(1);
   });
 
+const server = http.createServer(app);
+setupSocket(server);
+
 // ======================================
 // # 🚀 4. Routes
 // ======================================
@@ -76,11 +79,11 @@ app.use("/api/artisans", artisanRoutes);
 app.use("/api/trips", tripRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/addresses", addressRoutes);
-app.use('/api/notifications', notificationRoutes)
-app.use('/api/portfolios', portfolioRoutes)
-app.use('/api/orders', orderRoutes)
-app.use('/api/offers', offerRoutes)
-app.use('/api/chats', chats)
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/portfolios", portfolioRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/offers", offerRoutes);
+app.use("/api/chats", chats);
 
 // ======================================
 // # 🩺 5. Health Check Endpoint
@@ -111,9 +114,7 @@ app.use((err, req, res, next) => {
 // ======================================
 const PORT = process.env.PORT || 5000;
 
-const server = http.createServer(app);
-
-setupSocket(server);
+// setupSocket(server);
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
