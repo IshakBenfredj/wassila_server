@@ -43,7 +43,7 @@ const limiter = rateLimit({
   max: 100,
   message: "Too many requests, please try again later.",
 });
-app.use(limiter);
+// app.use(limiter);
 
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan("dev"));
@@ -68,6 +68,7 @@ mongoose
 // ======================================
 // # 🚀 4. Routes
 // ======================================
+// app.set("trust proxy", 1);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/drivers", driverRoutes);

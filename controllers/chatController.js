@@ -4,11 +4,10 @@ const Message = require("../models/Message");
 exports.getChats = async (req, res) => {
   try {
     const userId = req.user._id;
-
-    const chats = await Chat.find({ members: userId })
+    const chats = await Chat.find({ members: { $in: [userId] } })
       .sort({ updatedAt: -1 })
       .populate("members")
-      .lean();
+      .populate("lastMessage.senderId");
 
     const enrichedChats = await Promise.all(
       chats.map(async (chat) => {
@@ -19,7 +18,7 @@ exports.getChats = async (req, res) => {
         });
 
         return {
-          ...chat,
+          ...chat.toObject(),
           unreadCount,
         };
       })
@@ -30,6 +29,7 @@ exports.getChats = async (req, res) => {
       data: enrichedChats,
     });
   } catch (err) {
+    console.error("Error fetching chats:", err);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء جلب المحادثات",
@@ -60,19 +60,22 @@ exports.createOrGetChat = async (req, res) => {
     res.json({
       success: true,
       data: chat,
-      message: "تم إنشاء المحادثة بنجاح",
+      message: "تم إنشاء/جلب المحادثة بنجاح",
     });
   } catch (err) {
+    console.error("Error creating/getting chat:", err);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ أثناء إنشاء المحادثة",
+      message: "حدث خطأ أثناء إنشاء/جلب المحادثة",
     });
   }
 };
 
 exports.sendMessage = async (req, res) => {
+  console.log("sendMessage called with body:", req.body);
   try {
-    const { chatId, senderId, receiverId, text } = req.body;
+    const { chatId, receiverId, text } = req.body;
+    const senderId = req.user._id;
 
     if (!senderId || !receiverId || !text) {
       return res.status(400).json({
@@ -111,6 +114,7 @@ exports.sendMessage = async (req, res) => {
       data: message,
     });
   } catch (err) {
+    console.error("Error sending message:", err);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء إرسال الرسالة",
@@ -123,15 +127,15 @@ exports.getMessages = async (req, res) => {
     const { chatId } = req.params;
 
     const messages = await Message.find({ chatId })
-      .sort({ createdAt: -1 })
-      .populate("receiverId") // 👈 for showing receiver user details
-      .lean();
+      .sort({ createdAt: 1 })
+      .populate("receiverId");
 
     res.json({
       success: true,
       data: messages,
     });
   } catch (err) {
+    console.error("Error fetching messages:", err);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء جلب الرسائل",
@@ -167,6 +171,7 @@ exports.deleteMessage = async (req, res) => {
       message: "تم حذف الرسالة بنجاح",
     });
   } catch (err) {
+    console.error("Error deleting message:", err);
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء حذف الرسالة",

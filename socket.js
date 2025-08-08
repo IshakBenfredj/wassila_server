@@ -29,7 +29,7 @@ function setupSocket(server) {
         _id,
         name,
         image,
-        role, // "client", "driver", "admin"...
+        role,
         socketId: socket.id,
         connectedAt: new Date().toISOString(),
       });
@@ -210,9 +210,9 @@ function setupSocket(server) {
     /* =============== ✅ SEND MESSAGE =============== */
     socket.on("sendMessage", async (messageData) => {
       const { receiverId, senderId } = messageData;
-
-      const receiver = connectedClients.find((c) => c._id === receiverId);
-      const sender = connectedClients.find((c) => c._id === senderId);
+      console.log('messageData', messageData);
+      const receiver = connectedUsers.find((c) => c._id === receiverId);
+      const sender = connectedUsers.find((c) => c._id === senderId);
 
       if (receiver) {
         io.to(receiver.socketId).emit("newMessage", messageData);
@@ -235,7 +235,7 @@ function setupSocket(server) {
           return callback({ success: false, message: "الرسالة غير موجودة" });
         }
 
-        if (msg.senderId.toString() !== userId) {
+        if (msg.senderId !== userId) {
           return callback({
             success: false,
             message: "غير مسموح بحذف الرسالة",
@@ -246,9 +246,9 @@ function setupSocket(server) {
 
         // Notify only relevant users (sender + receiver)
         const chat = await Chat.findById(msg.chatId);
-        const chatParticipants = [chat.user1.toString(), chat.user2.toString()];
+        const chatParticipants = [chat.members[0], chat.user2.members[1]];
 
-        connectedClients.forEach((client) => {
+        connectedUsers.forEach((client) => {
           if (chatParticipants.includes(client._id)) {
             io.to(client.socketId).emit("messageDeleted", {
               messageId,
@@ -267,25 +267,44 @@ function setupSocket(server) {
 
     /* =============== ✅ MARK MESSAGES READ =============== */
     socket.on("markRead", async ({ chatId, userId }) => {
-      await Message.updateMany(
-        { chatId, receiverId: userId, read: false },
-        { $set: { read: true } }
-      );
+      try {
+        // Update all unread messages in this chat for this user
+        await Message.updateMany(
+          {
+            chatId,
+            receiverId: userId,
+            read: false,
+          },
+          { $set: { read: true } }
+        );
 
-      await Chat.findByIdAndUpdate(chatId, {
-        "lastMessage.read": true,
-      });
-
-      // Notify both sender and receiver
-      const chat = await Chat.findById(chatId);
-      const participants = [chat.user1.toString(), chat.user2.toString()];
-
-      connectedClients.forEach((client) => {
-        if (participants.includes(client._id)) {
-          io.to(client.socketId).emit("messagesRead", { chatId, userId });
-          io.to(client.socketId).emit("refreshChats");
+        // Update the last message read status in the chat
+        const chat = await Chat.findById(chatId);
+        if (
+          chat?.lastMessage &&
+          chat.lastMessage.senderId.toString() !== userId
+        ) {
+          await Chat.findByIdAndUpdate(chatId, {
+            "lastMessage.read": true,
+          });
         }
-      });
+
+        // Notify both participants
+        const participants = chat.members.map((m) => m.toString());
+
+        // Find connected clients who are participants
+        const clientsToNotify = connectedUsers.filter((client) =>
+          participants.includes(client._id)
+        );
+
+        // Emit events to all relevant clients
+        clientsToNotify.forEach((client) => {
+          io.to(client.socketId).emit("messagesRead", { chatId });
+          io.to(client.socketId).emit("refreshChats");
+        });
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+      }
     });
 
     // Disconnect
