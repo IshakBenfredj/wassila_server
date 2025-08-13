@@ -7,6 +7,7 @@ const router = express.Router();
 router.put('/me', protect, userController.updateProfile);
 router.put('/change-password', protect, userController.changePassword);
 router.delete('/me', protect, userController.deleteAccount);
+router.put('/me/image', protect, userController.updateProfilePhoto);
 router.get("/profile", protect, userController.getClientProfileData);
 router.get("/profile/:userId", protect, userController.getClientProfileData);
 router.get("/driver-profile", protect, userController.getDriverProfileData);

@@ -1,6 +1,7 @@
 const { default: mongoose } = require("mongoose");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const { uploadSingleImage, deleteImageByUrl } = require("../lib/cloudinary");
 
 // @desc    Update user profile
 // @route   PUT /api/users/me
@@ -245,12 +246,12 @@ exports.getDriverProfileData = async (req, res) => {
           let: { driverId: "$driver._id" },
           pipeline: [
             { $match: { $expr: { $eq: ["$driver", "$$driverId"] } } },
-            { 
-              $group: { 
-                _id: null, 
-                totalPassengers: { $sum: "$placesNumber" } 
-              } 
-            }
+            {
+              $group: {
+                _id: null,
+                totalPassengers: { $sum: "$placesNumber" },
+              },
+            },
           ],
           as: "passengerSum",
         },
@@ -293,7 +294,10 @@ exports.getDriverProfileData = async (req, res) => {
           reviews: { $size: "$reviewList" },
           tripCount: { $size: "$trips" },
           passengerCount: {
-            $ifNull: [{ $arrayElemAt: ["$passengerSum.totalPassengers", 0] }, 0],
+            $ifNull: [
+              { $arrayElemAt: ["$passengerSum.totalPassengers", 0] },
+              0,
+            ],
           },
         },
       },
@@ -435,6 +439,56 @@ exports.getArtisanProfileData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "فشل تحميل البيانات",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update user profile photo
+// @route   PUT /api/users/me/image
+// @access  Private
+exports.updateProfilePhoto = async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        message: "يرجى رفع صورة جديدة",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    if (user.image) {
+      await deleteImageByUrl(user.image);
+    }
+
+    // 1) Upload image to Cloudinary
+    const uploadResult = await uploadSingleImage(image, "profile_photos");
+
+    // 2) Update user's image
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { image: uploadResult.secure_url },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.status(200).json({
+      success: true,
+      message: "تم تحديث صورة الملف الشخصي بنجاح",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("خطأ في تحديث صورة الملف الشخصي:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء تحديث صورة الملف الشخصي",
       error: error.message,
     });
   }
