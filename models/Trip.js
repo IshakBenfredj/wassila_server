@@ -9,7 +9,7 @@ const tripSchema = new mongoose.Schema(
   {
     driver: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Driver"
+      ref: "Driver",
     },
     client: {
       type: mongoose.Schema.Types.ObjectId,
@@ -43,13 +43,15 @@ const tripSchema = new mongoose.Schema(
       enum: transportTypes,
       required: true,
     },
-    vehicleType: [{
-      type: String,
-      enum: vehicleTypes,
-    }],
+    vehicleType: [
+      {
+        type: String,
+        enum: vehicleTypes,
+      },
+    ],
     description: { type: String },
-    placesNumber: { type: Number, required: true, default : 1 },
-    price: { type: Number, required: true, default : 1000 },
+    placesNumber: { type: Number, required: true, default: 1 },
+    price: { type: Number, required: true, default: 1000 },
     status: { type: String, enum: requestStatuses, default: "pending" },
   },
   { timestamps: true }

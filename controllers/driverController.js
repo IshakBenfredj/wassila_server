@@ -6,7 +6,13 @@ const { vehicleTypes, transportTypes } = require("../constants/enum");
 // @route   PUT /api/drivers/me
 // @access  Private/Driver
 exports.updateDriverProfile = async (req, res) => {
+  const log = (message, data = {}) => {
+    console.log(`[DriverProfileUpdate][${new Date().toISOString()}] ${message}`, data);
+  };
+
   try {
+    log('Update request received', { userId: req.user.id, body: req.body });
+
     const {
       vehicleType,
       transportType,
@@ -19,10 +25,13 @@ exports.updateDriverProfile = async (req, res) => {
 
     // Validate transport types
     if (transportType) {
+      log('Validating transport types', { transportType });
       const invalidTypes = transportType.filter(
         (type) => !transportTypes.includes(type)
       );
+      
       if (invalidTypes.length > 0) {
+        log('Invalid transport types detected', { invalidTypes });
         return res.status(400).json({
           success: false,
           message: `أنواع النقل غير صالحة: ${invalidTypes.join(", ")}`,
@@ -31,30 +40,61 @@ exports.updateDriverProfile = async (req, res) => {
     }
 
     const updates = {};
+    
+    // Validate and add vehicle type
     if (vehicleType) {
+      log('Validating vehicle type', { vehicleType });
       if (!vehicleTypes.includes(vehicleType)) {
+        log('Invalid vehicle type detected', { vehicleType });
         return res.status(400).json({
           success: false,
           message: "نوع المركبة غير صالح",
         });
       }
       updates.vehicleType = vehicleType;
+      log('Vehicle type validated and added to updates');
     }
-    if (transportType) updates.transportType = transportType;
-    if (vehicleName) updates.vehicleName = vehicleName;
-    if (licenseNumber) updates.licenseNumber = licenseNumber;
-    if (issueDate) updates.issueDate = new Date(issueDate);
-    if (expiryDate) updates.expiryDate = new Date(expiryDate);
-    if (placesNumber) updates.placesNumber = placesNumber;
+
+    // Add other fields to updates
+    if (transportType) {
+      updates.transportType = transportType;
+      log('Transport type added to updates');
+    }
+    if (vehicleName) {
+      updates.vehicleName = vehicleName;
+      log('Vehicle name added to updates');
+    }
+    if (licenseNumber) {
+      updates.licenseNumber = licenseNumber;
+      log('License number added to updates');
+    }
+    if (issueDate) {
+      updates.issueDate = new Date(issueDate);
+      log('Issue date added to updates', { issueDate: updates.issueDate });
+    }
+    if (expiryDate) {
+      updates.expiryDate = new Date(expiryDate);
+      log('Expiry date added to updates', { expiryDate: updates.expiryDate });
+    }
+    if (placesNumber) {
+      updates.placesNumber = placesNumber;
+      log('Places number added to updates');
+    }
 
     // Validate license expiry date
-    if (updates.expiryDate && new Date(updates.expiryDate) <= new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "تاريخ انتهاء الرخصة يجب أن يكون في المستقبل",
-      });
+    if (updates.expiryDate) {
+      log('Validating license expiry date');
+      if (new Date(updates.expiryDate) <= new Date()) {
+        log('Expired license detected', { expiryDate: updates.expiryDate });
+        return res.status(400).json({
+          success: false,
+          message: "تاريخ انتهاء الرخصة يجب أن يكون في المستقبل",
+        });
+      }
+      log('License expiry date validated');
     }
 
+    log('Attempting to update driver profile', { updates });
     const updatedDriver = await Driver.findOneAndUpdate(
       { user: req.user.id },
       updates,
@@ -62,23 +102,30 @@ exports.updateDriverProfile = async (req, res) => {
     ).populate("user", "name email phone image");
 
     if (!updatedDriver) {
+      log('Driver not found', { userId: req.user.id });
       return res.status(404).json({
         success: false,
         message: "لم يتم العثور على بيانات السائق",
       });
     }
 
+    log('Driver profile updated successfully', { driverId: updatedDriver._id });
     res.status(200).json({
       success: true,
       message: "تم تحديث بيانات السائق بنجاح",
       data: updatedDriver,
     });
+
   } catch (error) {
-    console.error("خطأ في تحديث بيانات السائق:", error);
+    log('Error updating driver profile', { 
+      error: error.message,
+      stack: error.stack 
+    });
+    
     res.status(500).json({
       success: false,
       message: "حدث خطأ أثناء تحديث بيانات السائق",
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

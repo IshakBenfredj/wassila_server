@@ -235,7 +235,7 @@ function setupSocket(server) {
         // Check if chat already exists between these users
         let existingChat = await Chat.findOne({
           participants: { $all: participants },
-        }).populate("participants", "name image role");
+        }).populate("participants");
 
         if (existingChat) {
           callback({ success: true, chat: existingChat });
@@ -249,7 +249,7 @@ function setupSocket(server) {
         });
 
         await newChat.save();
-        await newChat.populate("participants", "name image role");
+        await newChat.populate("participants");
 
         callback({ success: true, chat: newChat });
         console.log(
@@ -266,7 +266,7 @@ function setupSocket(server) {
         const chats = await Chat.find({
           participants: userId,
         })
-          .populate("participants", "name image role")
+          .populate("participants")
           .populate({
             path: "lastMessage",
             populate: {

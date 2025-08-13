@@ -1,13 +1,8 @@
 export const transportTypes = [
   "cargo",
-  "food_delivery",
-  "out_of_state",
+  "urban_transport",
+  "suburban_transport",
   "interstate",
-  "passenger",
-  "school_transport",
-  "corporate_transport",
-  "tourist_transport",
-  "medical_transport",
 ];
 
 export const vehicleTypes = ["car", "motorcycle", "small_truck", "large_truck"];
@@ -47,7 +42,6 @@ export const artisanTypes = [
   "solar_panel_installer",
   "safety_technician",
 ];
-
 
 export const userRoles = ["admin", "artisan", "driver", "client"];
 
