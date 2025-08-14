@@ -5,6 +5,7 @@ const Chat = require("../models/Chat");
 const Driver = require("../models/Driver");
 const Trip = require("../models/Trip");
 const Order = require("../models/Order");
+const User = require("../models/User");
 
 router.get("/check-access/:otherUserId", protect, async (req, res) => {
   try {
@@ -70,6 +71,7 @@ router.get("/check-access/:otherUserId", protect, async (req, res) => {
     return res.status(200).json({
       success: true,
       hasPermission,
+      otherUser
     });
   } catch (error) {
     console.error("Error checking chat access:", error);
