@@ -442,7 +442,7 @@ function setupSocket(server) {
       text,
       type,
       createdAt: new Date(),
-      read: false // Explicitly set to false
+      read: false 
     });
 
     await newMessage.save();
