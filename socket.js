@@ -404,63 +404,75 @@ function setupSocket(server) {
     //   }
     // });
 
-    socket.on("sendMessage", async (data) => {
-      try {
-        const { chatId, senderId, text, type = "text", participants } = data;
+   socket.on("sendMessage", async (data) => {
+  try {
+    const { chatId, senderId, text, type = "text", participants } = data;
 
-        let chat;
-        if (!chatId && participants?.length) {
-          chat = new Chat({
-            participants,
-            createdAt: new Date(),
-          });
-          await chat.save();
-          await chat.populate("participants");
+    let chat;
+    if (!chatId && participants?.length) {
+      // Create new chat
+      chat = new Chat({
+        participants,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      await chat.save();
+      await chat.populate("participants");
 
-          // Emit new chat to all participants
-          participants.forEach((participantId) => {
-            const participantSockets = connectedUsers.filter(
-              (u) => u._id === participantId
-            );
-            participantSockets.forEach((user) => {
-              io.to(user.socketId).emit("chatCreated", chat);
-            });
-          });
-        } else {
-          chat = await Chat.findById(chatId).populate("participants");
-        }
-
-        // Create the message
-        const newMessage = new Message({
-          chat: chat._id,
-          sender: senderId,
-          text,
-          type,
-          createdAt: new Date(),
-          read: false,
+      // Emit new chat to all participants
+      participants.forEach((participantId) => {
+        const participantSockets = connectedUsers.filter(
+          (u) => u._id === participantId
+        );
+        participantSockets.forEach((user) => {
+          io.to(user.socketId).emit("chatCreated", chat);
         });
-
-        await newMessage.save();
-        await newMessage.populate("sender", "name image");
-
-        // Update last message
-        chat.lastMessage = newMessage._id;
-        chat.updatedAt = new Date();
-        await chat.save();
-
-        // Emit new message to all participants
-        chat.participants.forEach((p) => {
-          const sockets = connectedUsers.filter(
-            (u) => u._id === p._id.toString()
-          );
-          sockets.forEach((u) => {
-            io.to(u.socketId).emit("newMessage", newMessage);
-          });
-        });
-      } catch (error) {
-        console.error("Error sending message:", error);
+      });
+    } else {
+      chat = await Chat.findById(chatId).populate("participants");
+      if (!chat) {
+        throw new Error("Chat not found");
       }
+    }
+
+    // Create the message - ensure read is false for new messages
+    const newMessage = new Message({
+      chat: chat._id,
+      sender: senderId,
+      text,
+      type,
+      createdAt: new Date(),
+      read: false // Explicitly set to false
     });
+
+    await newMessage.save();
+    await newMessage.populate("sender", "name image");
+
+    // Update last message
+    chat.lastMessage = newMessage._id;
+    chat.updatedAt = new Date();
+    await chat.save();
+
+    // Emit new message to all participants
+    const messageToEmit = {
+      ...newMessage.toObject(),
+      // Ensure read status is false when emitting
+      read: false
+    };
+
+    chat.participants.forEach((p) => {
+      const sockets = connectedUsers.filter(
+        (u) => u._id === p._id.toString()
+      );
+      sockets.forEach((u) => {
+        io.to(u.socketId).emit("newMessage", messageToEmit);
+      });
+    });
+
+  } catch (error) {
+    console.error("Error sending message:", error);
+  }
+});
 
     socket.on("markMessagesRead", async (data) => {
       try {
