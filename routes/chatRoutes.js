@@ -6,42 +6,34 @@ const Driver = require("../models/Driver");
 const Trip = require("../models/Trip");
 const Order = require("../models/Order");
 
-router.get("/check-access/:chatId", protect, async (req, res) => {
+router.get("/check-access/:otherUserId", protect, async (req, res) => {
   try {
-    const { chatId } = req.params;
+    const { otherUserId } = req.params;
     const user = req.user;
 
-    // Find chat and verify user is a participant
-    const chat = await Chat.findOne({
-      _id: chatId,
-      participants: { $in: [user._id] },
-    }).populate("participants");
-
-    if (!chat) {
+    // Verify the other user exists
+    const otherUser = await User.findById(otherUserId);
+    if (!otherUser) {
       return res.status(404).json({
         success: false,
-        message: "Chat not found or access denied",
+        message: "User not found",
       });
     }
 
-    // Find the other participant
-    const otherParticipant = chat.participants.find(
-      (participant) => participant._id.toString() !== user._id.toString()
-    );
-
-    if (!otherParticipant) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid chat configuration",
+    // Users can always chat with themselves (for notes, etc.)
+    if (otherUserId === user._id.toString()) {
+      return res.status(200).json({
+        success: true,
+        hasPermission: true,
       });
     }
 
     let hasPermission = false;
 
     // Check driver-client relationship
-    if (user.role === "driver" || otherParticipant.role === "driver") {
-      const driverUserId = user.role === "driver" ? user._id : otherParticipant._id;
-      const clientUserId = user.role === "driver" ? otherParticipant._id : user._id;
+    if (user.role === "driver" || otherUser.role === "driver") {
+      const driverUserId = user.role === "driver" ? user._id : otherUserId;
+      const clientUserId = user.role === "driver" ? otherUserId : user._id;
 
       const driver = await Driver.findOne({ user: driverUserId });
       if (driver) {
@@ -55,16 +47,18 @@ router.get("/check-access/:chatId", protect, async (req, res) => {
     }
 
     // Check artisan-client relationship
-    if (!hasPermission && (user.role === "artisan" || otherParticipant.role === "artisan")) {
-      const artisanUserId = user.role === "artisan" ? user._id : otherParticipant._id;
-      const clientUserId = user.role === "artisan" ? otherParticipant._id : user._id;
+    if (
+      !hasPermission &&
+      (user.role === "artisan" || otherUser.role === "artisan")
+    ) {
+      const artisanUserId = user.role === "artisan" ? user._id : otherUserId;
+      const clientUserId = user.role === "artisan" ? otherUserId : user._id;
 
       const order = await Order.findOne({
         client: clientUserId,
         artisan: artisanUserId,
         status: "accepted",
       });
-      console.log('order', order)
       hasPermission = !!order;
     }
 
@@ -75,9 +69,8 @@ router.get("/check-access/:chatId", protect, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      hasPermission
+      hasPermission,
     });
-
   } catch (error) {
     console.error("Error checking chat access:", error);
     return res.status(500).json({
