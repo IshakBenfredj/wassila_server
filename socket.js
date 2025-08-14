@@ -228,11 +228,44 @@ function setupSocket(server) {
     // Add these chat-related socket events to your existing setupSocket function
 
     // Chat Management
+    // socket.on("createChat", async (data, callback) => {
+    //   try {
+    //     const { participants } = data;
+
+    //     // Check if chat already exists between these users
+    //     let existingChat = await Chat.findOne({
+    //       participants: { $all: participants },
+    //     }).populate("participants");
+
+    //     if (existingChat) {
+    //       callback({ success: true, chat: existingChat });
+    //       return;
+    //     }
+
+    //     // Create new chat
+    //     const newChat = new Chat({
+    //       participants,
+    //       createdAt: new Date(),
+    //     });
+
+    //     await newChat.save();
+    //     await newChat.populate("participants");
+
+    //     callback({ success: true, chat: newChat });
+    //     console.log(
+    //       `💬 New chat created between users: ${participants.join(", ")}`
+    //     );
+    //   } catch (error) {
+    //     console.error("Error creating chat:", error);
+    //     callback({ success: false, error: error.message });
+    //   }
+    // });
+
     socket.on("createChat", async (data, callback) => {
       try {
         const { participants } = data;
 
-        // Check if chat already exists between these users
+        // Check if chat already exists
         let existingChat = await Chat.findOne({
           participants: { $all: participants },
         }).populate("participants");
@@ -252,6 +285,17 @@ function setupSocket(server) {
         await newChat.populate("participants");
 
         callback({ success: true, chat: newChat });
+
+        // ✅ Emit to all participants (except the creator)
+        participants.forEach((participantId) => {
+          const participantSockets = connectedUsers.filter(
+            (u) => u._id === participantId
+          );
+          participantSockets.forEach((user) => {
+            io.to(user.socketId).emit("chatCreated", newChat);
+          });
+        });
+
         console.log(
           `💬 New chat created between users: ${participants.join(", ")}`
         );
@@ -314,13 +358,82 @@ function setupSocket(server) {
       }
     });
 
+    // socket.on("sendMessage", async (data) => {
+    //   try {
+    //     const { chatId, senderId, text, type = "text" } = data;
+
+    //     // Create new message
+    //     const newMessage = new Message({
+    //       chat: chatId,
+    //       sender: senderId,
+    //       text,
+    //       type,
+    //       createdAt: new Date(),
+    //       read: false,
+    //     });
+
+    //     await newMessage.save();
+    //     await newMessage.populate("sender", "name image");
+
+    //     // Update chat's last message and updatedAt
+    //     await Chat.findByIdAndUpdate(chatId, {
+    //       lastMessage: newMessage._id,
+    //       updatedAt: new Date(),
+    //     });
+
+    //     // Get chat participants to emit to specific users
+    //     const chat = await Chat.findById(chatId).populate(
+    //       "participants",
+    //       "_id"
+    //     );
+    //     const participantIds = chat.participants.map((p) => p._id.toString());
+
+    //     // Emit to all participants
+    //     participantIds.forEach((participantId) => {
+    //       const participantSockets = connectedUsers.filter(
+    //         (u) => u._id === participantId
+    //       );
+    //       participantSockets.forEach((user) => {
+    //         io.to(user.socketId).emit("newMessage", newMessage);
+    //       });
+    //     });
+
+    //     console.log(`💬 Message sent in chat ${chatId}: ${text}`);
+    //   } catch (error) {
+    //     console.error("Error sending message:", error);
+    //   }
+    // });
+
     socket.on("sendMessage", async (data) => {
       try {
-        const { chatId, senderId, text, type = "text" } = data;
+        const { chatId, senderId, text, type = "text", participants } = data;
 
-        // Create new message
+        let chat;
+        if (!chatId && participants?.length) {
+          // Create new chat if doesn't exist
+          chat = new Chat({
+            participants,
+            createdAt: new Date(),
+          });
+          await chat.save();
+          await chat.populate("participants");
+
+          // Emit new chat to all participants
+          participants.forEach((participantId) => {
+            const participantSockets = connectedUsers.filter(
+              (u) => u._id === participantId
+            );
+            participantSockets.forEach((user) => {
+              io.to(user.socketId).emit("chatCreated", chat);
+            });
+          });
+        } else {
+          chat = await Chat.findById(chatId).populate("participants");
+        }
+
+        // Create the message
         const newMessage = new Message({
-          chat: chatId,
+          chat: chat._id,
           sender: senderId,
           text,
           type,
@@ -331,30 +444,20 @@ function setupSocket(server) {
         await newMessage.save();
         await newMessage.populate("sender", "name image");
 
-        // Update chat's last message and updatedAt
-        await Chat.findByIdAndUpdate(chatId, {
-          lastMessage: newMessage._id,
-          updatedAt: new Date(),
-        });
+        // Update last message
+        chat.lastMessage = newMessage._id;
+        chat.updatedAt = new Date();
+        await chat.save();
 
-        // Get chat participants to emit to specific users
-        const chat = await Chat.findById(chatId).populate(
-          "participants",
-          "_id"
-        );
-        const participantIds = chat.participants.map((p) => p._id.toString());
-
-        // Emit to all participants
-        participantIds.forEach((participantId) => {
-          const participantSockets = connectedUsers.filter(
-            (u) => u._id === participantId
+        // Emit new message to all participants
+        chat.participants.forEach((p) => {
+          const sockets = connectedUsers.filter(
+            (u) => u._id === p._id.toString()
           );
-          participantSockets.forEach((user) => {
-            io.to(user.socketId).emit("newMessage", newMessage);
+          sockets.forEach((u) => {
+            io.to(u.socketId).emit("newMessage", newMessage);
           });
         });
-
-        console.log(`💬 Message sent in chat ${chatId}: ${text}`);
       } catch (error) {
         console.error("Error sending message:", error);
       }
@@ -367,7 +470,7 @@ function setupSocket(server) {
         const result = await Message.updateMany(
           {
             chat: chatId,
-            sender: { $ne: userId }, 
+            sender: { $ne: userId },
             read: false,
           },
           { read: true }
