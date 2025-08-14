@@ -15,7 +15,6 @@ exports.createReview = async (req, res) => {
       });
     }
 
-    // لا يمكن تقييم نفسك
     if (req.user._id.equals(reviewedUser)) {
       return res.status(400).json({
         success: false,
@@ -44,16 +43,12 @@ exports.createReview = async (req, res) => {
       reviewText,
       reviewer: req.user._id,
       reviewedUser,
-      trip,
-      order,
+      ...(trip ? { trip } : { order }),
     });
 
     await review.save();
 
-    await review.populate("reviewer");
-    await review.populate("reviewedUser");
-    await review.populate("trip");
-    await review.populate("order");
+    await review.populate("reviewer reviewedUser trip order");
 
     res.status(201).json({
       success: true,
