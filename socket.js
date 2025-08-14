@@ -410,7 +410,6 @@ function setupSocket(server) {
 
         let chat;
         if (!chatId && participants?.length) {
-          // Create new chat if doesn't exist
           chat = new Chat({
             participants,
             createdAt: new Date(),
@@ -550,6 +549,25 @@ function setupSocket(server) {
           isTyping,
         });
       });
+    });
+
+    // In your socket.io backend
+    socket.on("checkExistingChat", async (data, callback) => {
+      try {
+        const { participants } = data;
+
+        const existingChat = await Chat.findOne({
+          participants: { $all: participants, $size: participants.length },
+        }).populate("participants");
+
+        callback({
+          exists: !!existingChat,
+          chat: existingChat || null,
+        });
+      } catch (error) {
+        console.error("Error checking existing chat:", error);
+        callback({ exists: false });
+      }
     });
 
     // Disconnect
