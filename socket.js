@@ -228,6 +228,230 @@ function setupSocket(server) {
     // Add these chat-related socket events to your existing setupSocket function
 
     // Chat Management
+    // socket.on("createChat", async (data, callback) => {
+    //   try {
+    //     const { participants } = data;
+
+    //     // Check if chat already exists between these users
+    //     let existingChat = await Chat.findOne({
+    //       participants: { $all: participants },
+    //     }).populate("participants");
+
+    //     if (existingChat) {
+    //       callback({ success: true, chat: existingChat });
+    //       return;
+    //     }
+
+    //     // Create new chat
+    //     const newChat = new Chat({
+    //       participants,
+    //       createdAt: new Date(),
+    //     });
+
+    //     await newChat.save();
+    //     await newChat.populate("participants");
+
+    //     callback({ success: true, chat: newChat });
+    //     console.log(
+    //       `💬 New chat created between users: ${participants.join(", ")}`
+    //     );
+    //   } catch (error) {
+    //     console.error("Error creating chat:", error);
+    //     callback({ success: false, error: error.message });
+    //   }
+    // });
+
+    // socket.on("getUserChats", async (userId, callback) => {
+    //   try {
+    //     const chats = await Chat.find({
+    //       participants: userId,
+    //     })
+    //       .populate("participants")
+    //       .populate({
+    //         path: "lastMessage",
+    //         populate: {
+    //           path: "sender",
+    //           select: "name image",
+    //         },
+    //       })
+    //       .sort({ updatedAt: -1 }); // Order by last message time
+
+    //     // Add unread count for each chat
+    //     const chatsWithUnread = await Promise.all(
+    //       chats.map(async (chat) => {
+    //         const unreadCount = await Message.countDocuments({
+    //           chat: chat._id,
+    //           sender: { $ne: userId },
+    //           read: false,
+    //         });
+
+    //         return {
+    //           ...chat.toObject(),
+    //           unreadCount,
+    //         };
+    //       })
+    //     );
+
+    //     callback(chatsWithUnread);
+    //   } catch (error) {
+    //     console.error("Error fetching user chats:", error);
+    //     callback([]);
+    //   }
+    // });
+
+    // socket.on("getChatMessages", async (data, callback) => {
+    //   try {
+    //     const { chatId, page = 1, limit = 50 } = data;
+
+    //     const messages = await Message.find({ chat: chatId })
+    //       .populate("sender", "name image")
+    //       .sort({ createdAt: 1 });
+
+    //     callback(messages.reverse()); // Reverse to show oldest first
+    //   } catch (error) {
+    //     console.error("Error fetching messages:", error);
+    //     callback([]);
+    //   }
+    // });
+
+    // socket.on("sendMessage", async (data) => {
+    //   try {
+    //     const { chatId, senderId, text, type = "text" } = data;
+
+    //     // Create new message
+    //     const newMessage = new Message({
+    //       chat: chatId,
+    //       sender: senderId,
+    //       text,
+    //       type,
+    //       createdAt: new Date(),
+    //       read: false,
+    //     });
+
+    //     await newMessage.save();
+    //     await newMessage.populate("sender", "name image");
+
+    //     // Update chat's last message and updatedAt
+    //     await Chat.findByIdAndUpdate(chatId, {
+    //       lastMessage: newMessage._id,
+    //       updatedAt: new Date(),
+    //     });
+
+    //     // Get chat participants to emit to specific users
+    //     const chat = await Chat.findById(chatId).populate(
+    //       "participants",
+    //       "_id"
+    //     );
+    //     const participantIds = chat.participants.map((p) => p._id.toString());
+
+    //     // Emit to all participants
+    //     participantIds.forEach((participantId) => {
+    //       const participantSockets = connectedUsers.filter(
+    //         (u) => u._id === participantId
+    //       );
+    //       participantSockets.forEach((user) => {
+    //         io.to(user.socketId).emit("newMessage", newMessage);
+    //       });
+    //     });
+
+    //     console.log(`💬 Message sent in chat ${chatId}: ${text}`);
+    //   } catch (error) {
+    //     console.error("Error sending message:", error);
+    //   }
+    // });
+
+    // socket.on("markMessagesRead", async (data) => {
+    //   try {
+    //     const { chatId, userId } = data;
+
+    //     const result = await Message.updateMany(
+    //       {
+    //         chat: chatId,
+    //         sender: { $ne: userId },
+    //         read: false,
+    //       },
+    //       { read: true }
+    //     );
+
+    //     const chat = await Chat.findById(chatId).populate(
+    //       "participants",
+    //       "_id"
+    //     );
+    //     if (chat) {
+    //       const participantIds = chat.participants.map((p) => p._id.toString());
+
+    //       participantIds.forEach((participantId) => {
+    //         const participantSockets = connectedUsers.filter(
+    //           (u) => u._id === participantId
+    //         );
+    //         participantSockets.forEach((user) => {
+    //           io.to(user.socketId).emit("messagesMarkedRead", {
+    //             chatId,
+    //             userId,
+    //           });
+    //         });
+    //       });
+    //     }
+
+    //     console.log(
+    //       `✅ ${result.modifiedCount} messages marked as read in chat ${chatId} by user ${userId}`
+    //     );
+    //   } catch (error) {
+    //     console.error("Error marking messages as read:", error);
+    //   }
+    // });
+
+    // socket.on("deleteChat", async (data) => {
+    //   try {
+    //     const { chatId, userId } = data;
+
+    //     // Delete all messages in the chat
+    //     await Message.deleteMany({ chat: chatId });
+
+    //     // Delete the chat
+    //     await Chat.findByIdAndDelete(chatId);
+
+    //     // Get chat participants to emit deletion
+    //     const chat = await Chat.findById(chatId).populate(
+    //       "participants",
+    //       "_id"
+    //     );
+    //     if (chat) {
+    //       const participantIds = chat.participants.map((p) => p._id.toString());
+
+    //       participantIds.forEach((participantId) => {
+    //         const participantSockets = connectedUsers.filter(
+    //           (u) => u._id === participantId
+    //         );
+    //         participantSockets.forEach((user) => {
+    //           io.to(user.socketId).emit("chatDeleted", { chatId });
+    //         });
+    //       });
+    //     }
+
+    //     console.log(`🗑️ Chat ${chatId} deleted by user ${userId}`);
+    //   } catch (error) {
+    //     console.error("Error deleting chat:", error);
+    //   }
+    // });
+
+    // socket.on("typing", (data) => {
+    //   const { chatId, userId, isTyping } = data;
+
+    //   // Emit typing status to other participants
+    //   const chat = connectedUsers.filter((u) => u._id !== userId);
+    //   chat.forEach((user) => {
+    //     io.to(user.socketId).emit("userTyping", {
+    //       chatId,
+    //       userId,
+    //       isTyping,
+    //     });
+    //   });
+    // });
+
+    // New
+    // Server-side socket handlers with improved functionality
+
     socket.on("createChat", async (data, callback) => {
       try {
         const { participants } = data;
@@ -235,9 +459,28 @@ function setupSocket(server) {
         // Check if chat already exists between these users
         let existingChat = await Chat.findOne({
           participants: { $all: participants },
+          // Only find chats that are not deleted by both users
+          $or: [
+            { deletedBy: { $exists: false } },
+            { deletedBy: { $size: 0 } },
+            { deletedBy: { $not: { $all: participants } } },
+          ],
         }).populate("participants");
 
         if (existingChat) {
+          // If chat was deleted by current user, remove them from deletedBy array
+          if (existingChat.deletedBy && existingChat.deletedBy.length > 0) {
+            const currentUserId = participants.find((id) =>
+              existingChat.deletedBy.includes(id)
+            );
+            if (currentUserId) {
+              existingChat.deletedBy = existingChat.deletedBy.filter(
+                (id) => id.toString() !== currentUserId.toString()
+              );
+              await existingChat.save();
+            }
+          }
+
           callback({ success: true, chat: existingChat });
           return;
         }
@@ -246,6 +489,7 @@ function setupSocket(server) {
         const newChat = new Chat({
           participants,
           createdAt: new Date(),
+          deletedBy: [], // Track who deleted the chat
         });
 
         await newChat.save();
@@ -265,6 +509,11 @@ function setupSocket(server) {
       try {
         const chats = await Chat.find({
           participants: userId,
+          // Exclude chats deleted by this user
+          $or: [
+            { deletedBy: { $exists: false } },
+            { deletedBy: { $ne: userId } },
+          ],
         })
           .populate("participants")
           .populate({
@@ -274,15 +523,20 @@ function setupSocket(server) {
               select: "name image",
             },
           })
-          .sort({ updatedAt: -1 }); // Order by last message time
+          .sort({ updatedAt: -1 });
 
-        // Add unread count for each chat
+        // Add unread count for each chat (excluding deleted messages)
         const chatsWithUnread = await Promise.all(
           chats.map(async (chat) => {
             const unreadCount = await Message.countDocuments({
               chat: chat._id,
               sender: { $ne: userId },
               read: false,
+              // Exclude messages deleted by this user
+              $or: [
+                { deletedBy: { $exists: false } },
+                { deletedBy: { $ne: userId } },
+              ],
             });
 
             return {
@@ -301,13 +555,22 @@ function setupSocket(server) {
 
     socket.on("getChatMessages", async (data, callback) => {
       try {
-        const { chatId, page = 1, limit = 50 } = data;
+        const { chatId, page = 1, limit = 50, userId } = data;
 
-        const messages = await Message.find({ chat: chatId })
+        const messages = await Message.find({
+          chat: chatId,
+          // Exclude messages deleted by this user
+          $or: [
+            { deletedBy: { $exists: false } },
+            { deletedBy: { $ne: userId } },
+          ],
+        })
           .populate("sender", "name image")
-          .sort({ createdAt: 1 });
+          .sort({ createdAt: 1 })
+          .limit(limit)
+          .skip((page - 1) * limit);
 
-        callback(messages.reverse()); // Reverse to show oldest first
+        callback(messages.reverse());
       } catch (error) {
         console.error("Error fetching messages:", error);
         callback([]);
@@ -326,6 +589,7 @@ function setupSocket(server) {
           type,
           createdAt: new Date(),
           read: false,
+          deletedBy: [], // Track who deleted this message
         });
 
         await newMessage.save();
@@ -360,6 +624,70 @@ function setupSocket(server) {
       }
     });
 
+    socket.on("deleteMessage", async (data) => {
+      try {
+        const { messageId, userId, deleteForEveryone = false } = data;
+
+        const message = await Message.findById(messageId).populate("chat");
+
+        if (!message) {
+          return;
+        }
+
+        if (deleteForEveryone && message.sender.toString() === userId) {
+          // Delete for everyone - actually remove the message
+          await Message.findByIdAndDelete(messageId);
+
+          // Update chat's last message if this was the last message
+          const chat = await Chat.findById(message.chat._id);
+          if (chat.lastMessage && chat.lastMessage.toString() === messageId) {
+            const lastMessage = await Message.findOne({
+              chat: message.chat._id,
+              _id: { $ne: messageId },
+            }).sort({ createdAt: -1 });
+
+            chat.lastMessage = lastMessage ? lastMessage._id : null;
+            await chat.save();
+          }
+        } else {
+          // Delete only for this user
+          if (!message.deletedBy) {
+            message.deletedBy = [];
+          }
+
+          if (!message.deletedBy.includes(userId)) {
+            message.deletedBy.push(userId);
+            await message.save();
+          }
+        }
+
+        // Get chat participants to emit the deletion
+        const chat = await Chat.findById(message.chat._id).populate(
+          "participants",
+          "_id"
+        );
+        const participantIds = chat.participants.map((p) => p._id.toString());
+
+        participantIds.forEach((participantId) => {
+          const participantSockets = connectedUsers.filter(
+            (u) => u._id === participantId
+          );
+          participantSockets.forEach((user) => {
+            io.to(user.socketId).emit("messageDeleted", {
+              messageId,
+              chatId: message.chat._id,
+              deleteForEveryone,
+              deletedBy: userId,
+            });
+          });
+        });
+
+        console.log(`🗑️ Message ${messageId} deleted by user ${userId}`);
+      } catch (error) {
+        console.error("Error deleting message:", error);
+      }
+    });
+
     socket.on("markMessagesRead", async (data) => {
       try {
         const { chatId, userId } = data;
@@ -367,8 +695,13 @@ function setupSocket(server) {
         const result = await Message.updateMany(
           {
             chat: chatId,
-            sender: { $ne: userId }, 
+            sender: { $ne: userId },
             read: false,
+            // Only mark messages that aren't deleted by this user
+            $or: [
+              { deletedBy: { $exists: false } },
+              { deletedBy: { $ne: userId } },
+            ],
           },
           { read: true }
         );
@@ -405,31 +738,39 @@ function setupSocket(server) {
       try {
         const { chatId, userId } = data;
 
-        // Delete all messages in the chat
-        await Message.deleteMany({ chat: chatId });
+        const chat = await Chat.findById(chatId);
 
-        // Delete the chat
-        await Chat.findByIdAndDelete(chatId);
-
-        // Get chat participants to emit deletion
-        const chat = await Chat.findById(chatId).populate(
-          "participants",
-          "_id"
-        );
-        if (chat) {
-          const participantIds = chat.participants.map((p) => p._id.toString());
-
-          participantIds.forEach((participantId) => {
-            const participantSockets = connectedUsers.filter(
-              (u) => u._id === participantId
-            );
-            participantSockets.forEach((user) => {
-              io.to(user.socketId).emit("chatDeleted", { chatId });
-            });
-          });
+        if (!chat) {
+          return;
         }
 
-        console.log(`🗑️ Chat ${chatId} deleted by user ${userId}`);
+        // Add user to deletedBy array instead of deleting the chat
+        if (!chat.deletedBy) {
+          chat.deletedBy = [];
+        }
+
+        if (!chat.deletedBy.includes(userId)) {
+          chat.deletedBy.push(userId);
+          await chat.save();
+        }
+
+        // If both users have deleted the chat, then actually delete it
+        if (chat.deletedBy.length === chat.participants.length) {
+          // Delete all messages in the chat
+          await Message.deleteMany({ chat: chatId });
+          // Delete the chat
+          await Chat.findByIdAndDelete(chatId);
+
+          console.log(`🗑️ Chat ${chatId} permanently deleted`);
+        } else {
+          console.log(`🗑️ Chat ${chatId} hidden from user ${userId}`);
+        }
+
+        // Emit only to the user who deleted it
+        const userSockets = connectedUsers.filter((u) => u._id === userId);
+        userSockets.forEach((user) => {
+          io.to(user.socketId).emit("chatDeleted", { chatId });
+        });
       } catch (error) {
         console.error("Error deleting chat:", error);
       }

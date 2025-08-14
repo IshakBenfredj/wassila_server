@@ -1,30 +1,76 @@
-// models/Chat.js
-const mongoose = require('mongoose');
+// // models/Chat.js
+// const mongoose = require('mongoose');
 
-const chatSchema = new mongoose.Schema({
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }],
-  lastMessage: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
+// const chatSchema = new mongoose.Schema({
+//   participants: [{
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'User',
+//     required: true
+//   }],
+//   lastMessage: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'Message'
+//   },
+//   createdAt: {
+//     type: Date,
+//     default: Date.now
+//   },
+//   updatedAt: {
+//     type: Date,
+//     default: Date.now
+//   }
+// }, {
+//   timestamps: true
+// });
+
+// // Index for better performance
+// chatSchema.index({ participants: 1 });
+// chatSchema.index({ updatedAt: -1 });
+
+// module.exports = mongoose.model('Chat', chatSchema);
+
+// models/Chat.js
+const mongoose = require("mongoose");
+
+const chatSchema = new mongoose.Schema(
+  {
+    participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+    ],
+    lastMessage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    deletedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
+    ],
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
-}, {
-  timestamps: true
-});
+);
 
 // Index for better performance
 chatSchema.index({ participants: 1 });
 chatSchema.index({ updatedAt: -1 });
+chatSchema.index({ deletedBy: 1 });
 
-module.exports = mongoose.model('Chat', chatSchema);
+module.exports = mongoose.model("Chat", chatSchema);
